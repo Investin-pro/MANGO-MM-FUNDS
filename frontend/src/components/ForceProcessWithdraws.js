@@ -86,13 +86,12 @@ export const ForceProcessWithdraws = () => {
     const data = Buffer.alloc(dataLayout.span)
     dataLayout.encode(
       {
-        instruction: 5,
+        instruction: 12,
       },
       data
     )
     const keys =  [
       { pubkey: new PublicKey(fundPDA), isSigner: false, isWritable: true }, //fund State Account
-      { pubkey: key, isSigner: true, isWritable: true },
       { pubkey: new PublicKey(ids.mangoProgramId), isSigner: false, isWritable: false },
       { pubkey: new PublicKey(ids.publicKey), isSigner: false, isWritable: true },
       { pubkey: fundState.mango_account, isSigner: false, isWritable: true },
@@ -146,7 +145,7 @@ export const ForceProcessWithdraws = () => {
 
   return (
     <div className="form-div">
-      <h4>Init Force Settle</h4>
+      <h4>Force Process Withdraw</h4>
 
       Fund  ::: {' '}
         <input type="text" value={fundAddress} onChange={(event) => setFundAddress(event.target.value)} />
