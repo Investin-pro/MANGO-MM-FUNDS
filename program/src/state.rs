@@ -1,4 +1,3 @@
-use crate::error::FundError;
 use bytemuck::{from_bytes, from_bytes_mut, Pod, Zeroable};
 use fixed::types::I80F48;
 use solana_program::account_info::AccountInfo;

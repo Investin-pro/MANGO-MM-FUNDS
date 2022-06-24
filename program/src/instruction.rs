@@ -40,7 +40,9 @@ pub enum FundInstruction {
         open_order_index: u8,
     },
 
-    ForceWithdraws
+    ForceWithdraws, 
+
+    ResetMangoDelegate
     
 }
 
@@ -80,6 +82,8 @@ impl FundInstruction {
                 }
             },
             12 => FundInstruction::ForceWithdraws,
+            13 => FundInstruction::ResetMangoDelegate,
+
             _ => {
                 return None;
             }

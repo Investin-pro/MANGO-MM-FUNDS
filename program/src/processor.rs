@@ -24,7 +24,7 @@ use spl_token::{
 };
 use spl_associated_token_account::instruction::{self, AssociatedTokenAccountInstruction};
 
-use crate::{error::FundError, state::Loadable};
+use crate::{state::Loadable};
 use crate::instruction::FundInstruction;
 use crate::state::{FundData, InvestorData};
 
@@ -512,7 +512,7 @@ impl Fund {
         assert_eq!(mango_v3::id(), *mango_program_ai.key);
         assert_eq!(*mango_account_ai.key, fund_data.mango_account);
         let ts_check = Clock::get()?.unix_timestamp.checked_rem(WEEK_SECONDS).unwrap();
-        assert!((ts_check >= DAY_SECONDS + (10*HOUR_SECONDS)) && (ts_check <= (DAY_SECONDS + (12*HOUR_SECONDS)))); //Only from 10:00 to 12:00 UTC Every Friday
+        // assert!((ts_check >= DAY_SECONDS + (10*HOUR_SECONDS)) && (ts_check <= (DAY_SECONDS + (12*HOUR_SECONDS)))); //Only from 10:00 to 12:00 UTC Every Friday
         assert!(!fund_data.paused_for_settlement);
         fund_data.paused_for_settlement = true;
 
@@ -621,9 +621,9 @@ impl Fund {
         let perp_market_index = get_perp_index(mango_group_ai, mango_program_ai, perp_market_ai)?;
         assert!(fund_data.force_settle.perps[perp_market_index]);
         fund_data.force_settle.perps[perp_market_index] = false;
-        let mut k = vec![];
+        let mut packed_open_orders = vec![];
         for i in 0..packed_open_orders_ais.len(){
-            k[i] = *packed_open_orders_ais[i].key;
+            packed_open_orders.push(*packed_open_orders_ais[i].key);
         }
         
         let (side, quantity) = get_perp_vals(fund_data.force_settle.share, perp_market_index, mango_account_ai, mango_group_ai, mango_program_ai)?;
@@ -632,6 +632,7 @@ impl Fund {
             &manager_account.as_ref(),
             bytes_of(&signer_nonce),
         ];
+        drop(fund_data);
 
 
         invoke_signed(
@@ -670,7 +671,7 @@ impl Fund {
             asks_ai.key, 
             event_queue_ai.key, 
             Some(referrer_mango_account_ai.key), 
-            &k,
+            &packed_open_orders,
             side, 
             i64::MAX, 
             quantity, 
@@ -733,9 +734,9 @@ impl Fund {
         fund_data.force_settle.perps[spot_market_index] = false;
         let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
         let mut index: usize;
-        let mut open_orders = vec![];
+        let mut packed_open_orders = vec![];
         for i in 0..packed_open_orders_ais.len(){
-            open_orders[i] = *packed_open_orders_ais[i].key;
+            packed_open_orders.push(*packed_open_orders_ais[i].key);
         }
         let (side, price, coin_lots) = get_spot_vals(
             fund_data.force_settle.share, 
@@ -762,6 +763,8 @@ impl Fund {
             &manager_account.as_ref(),
             bytes_of(&signer_nonce),
         ];
+        drop(fund_data);
+
 
 
         invoke_signed(
@@ -780,7 +783,7 @@ impl Fund {
                 spot_market_ai.key,
                 bids_ai.key,
                 asks_ai.key,
-                &open_orders[open_orders_index as usize],
+                &packed_open_orders[open_orders_index as usize],
                 signer_ai.key,
                 dex_event_queue_ai.key,
                 dex_base_ai.key,
@@ -818,7 +821,7 @@ impl Fund {
             signer_ai.key,
             dex_signer_ai.key,
             msrm_or_srm_vault_ai.key,
-            &open_orders,
+            &packed_open_orders,
             open_orders_index as usize, 
             order,
         )?, 
@@ -1143,6 +1146,53 @@ impl Fund {
         Ok(())
     }
 
+    pub fn reset_mango_delegate(program_id: &Pubkey, accounts: &[AccountInfo]) -> Result<(), ProgramError> {
+        const NUM_FIXED: usize = 5;
+        let accounts = array_ref![accounts, 0, NUM_FIXED];
+
+        let [
+            fund_pda_ai, 
+            mango_program_ai, 
+            mango_group_ai, 
+            mango_account_ai, 
+            delegate_ai
+        ] = accounts;
+
+        let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
+
+        assert!(!fund_data.paused_for_settlement);
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert_eq!(*delegate_ai.key, fund_data.delegate);
+
+        let signer_nonce = fund_data.signer_nonce;
+        let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
+
+        let signer_seeds = [
+            &manager_account.as_ref(),
+            bytes_of(&signer_nonce),
+        ];
+        drop(fund_data);
+
+        invoke_signed(
+            &mango::instruction::set_delegate(
+                mango_program_ai.key,
+                mango_group_ai.key,
+                mango_account_ai.key,
+                fund_pda_ai.key,
+                delegate_ai.key,
+            )?,
+            &[
+                mango_program_ai.clone(),
+                mango_group_ai.clone(),
+                mango_account_ai.clone(),
+                fund_pda_ai.clone(),
+                delegate_ai.clone(),
+            ],
+            &[&signer_seeds],
+        )?;
+        Ok(())
+    }
+
     // instruction processor
     pub fn process(
         program_id: &Pubkey,
@@ -1192,6 +1242,10 @@ impl Fund {
                 msg!("FundInstruction::AddMangoDelegate");
                 return Self::set_mango_delegate(program_id, accounts);
             }
+            FundInstruction::ResetMangoDelegate => {
+                msg!("FundInstruction::ResetDelegate");
+                return Self::reset_mango_delegate(program_id, accounts);
+            }
             FundInstruction::PauseForSettlement => {
                 msg!("FundInstruction::PauseForSettlement");
                 return Self::pause_for_settlement(program_id, accounts);
@@ -1205,11 +1259,11 @@ impl Fund {
                 return Self::force_update_perp(program_id, accounts);
             }
             FundInstruction::ForceUpdateSpot { open_order_index } => {
-                msg!("FundInstruction::InvestorDeposit");
+                msg!("FundInstruction::ForceUpdateSpot");
                 return Self::force_update_spot(program_id, accounts, open_order_index);
             }
             FundInstruction::ForceWithdraws => {
-                msg!("FundInstruction::ProcessWithdraws");
+                msg!("FundInstruction::ForceWithdraws");
                 return Self::force_withdraws(program_id, accounts);
             }
             
