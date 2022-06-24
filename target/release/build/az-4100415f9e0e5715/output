@@ -1,0 +1,6 @@
+$ mkdir -p "/Users/zohebshahzan/code/Solana-2/target/release/build/az-4100415f9e0e5715/out/try_track_caller"
+$ cd "/Users/zohebshahzan/code/Solana-2/target/release/build/az-4100415f9e0e5715/out/try_track_caller"
+$ printf '%s' "// try_tra"... > "/Users/zohebshahzan/code/Solana-2/target/release/build/az-4100415f9e0e5715/out/try_track_caller/try_track_caller.rs"
+$ "rustc" "try_track_caller.rs" "--emit=dep-info,metadata" >& /dev/null
+cargo:rustc-cfg=track_caller
+$ rm -r "/Users/zohebshahzan/code/Solana-2/target/release/build/az-4100415f9e0e5715/out/try_track_caller"

@@ -1,0 +1,23 @@
+**/node_modules
+*.sw[po]
+*.lock
+/.cargo
+/dist
+dist
+.env
+src/client/util/store
+src/program-fund/target
+src/program-fund/Cargo.lock
+test-ledger/
+program-mm/target
+program-mm/Cargo.lock
+program-fund/target
+program-fund/Cargo.lock
+package-lock.json
+frontend/node_modules
+
+
+# Added by cargo
+
+/target
+program-fund/target/.rustc_info.json

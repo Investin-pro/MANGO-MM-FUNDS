@@ -1,0 +1,58 @@
+{
+  "name": "investin",
+  "version": "0.0.1",
+  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Investin-pro/Solana"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "clean": "npm run clean:program-fund && npm run clean:program-aggregator",
+    "build:program-aggregator": "cargo build-bpf --manifest-path=./programs/program-aggregator/Cargo.toml --bpf-out-dir=dist/program-aggregator",
+    "build:program-fund": "cargo build-bpf --manifest-path=./programs/program-fund/Cargo.toml --bpf-out-dir=dist/program-fund",
+    "build:program-mm": "cargo build-bpf --manifest-path=./programs/program-mm/Cargo.toml --bpf-out-dir=dist/program-mm",
+    "clean:program-aggregator": "cargo clean --manifest-path=./programs/program-aggregator/Cargo.toml && rm -rf ./dist/program-aggregator",
+    "clean:program-fund": "cargo clean --manifest-path=./programs/program-fund/Cargo.toml && rm -rf ./dist/program-fund",
+    "clean:program-mm": "cargo clean --manifest-path=./programs/program-mm/Cargo.toml && rm -rf ./dist/program-mm",
+    "postinstall": "cargo update --manifest-path=programs/program-fund/Cargo.toml"
+  },
+  "dependencies": {
+    "@blockworks-foundation/mango-client": "^3.0.4",
+    "@project-serum/borsh": "^0.2.2",
+    "@project-serum/serum": "^0.13.34",
+    "@project-serum/sol-wallet-adapter": "^0.2.0",
+    "@solana/spl-token": "0.0.13",
+    "@solana/web3.js": "^1.11.0",
+    "@types/lodash-es": "^4.17.4",
+    "big-number": "^2.0.0",
+    "bignumber.js": "^9.0.1",
+    "borsh": "^0.4.0",
+    "lodash": "^4.17.21",
+    "lodash-es": "^4.17.21",
+    "mz": "^2.7.0",
+    "yaml": "^1.10.2"
+  },
+  "devDependencies": {
+    "@tsconfig/recommended": "^1.0.1",
+    "@types/eslint": "^7.2.4",
+    "@types/eslint-plugin-prettier": "^3.1.0",
+    "@types/mz": "^2.7.2",
+    "@types/prettier": "^2.1.5",
+    "@types/yaml": "^1.9.7",
+    "@typescript-eslint/eslint-plugin": "^4.6.0",
+    "@typescript-eslint/parser": "^4.6.0",
+    "eslint": "^7.12.1",
+    "eslint-config-prettier": "^6.15.0",
+    "eslint-plugin-prettier": "^3.1.4",
+    "prettier": "^2.1.2",
+    "start-server-and-test": "^1.11.6",
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.5"
+  },
+  "engines": {
+    "node": "12.x"
+  }
+}

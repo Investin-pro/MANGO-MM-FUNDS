@@ -1,0 +1,53 @@
+{
+  "name": "connect-wallet-and-transfer",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@blockworks-foundation/mango-client": "=3.2.7",
+    "@project-serum/borsh": "^0.2.2",
+    "@project-serum/serum": "^0.13.37",
+    "@project-serum/sol-wallet-adapter": "^0.2.0",
+    "@solana/web3.js": "^1.43.1",
+    "@testing-library/jest-dom": "^5.11.4",
+    "@testing-library/react": "^11.1.0",
+    "@testing-library/user-event": "^12.1.10",
+    "bignumber.js": "^9.0.1",
+    "bn.js": "^5.2.0",
+    "bootstrap": "^5.0.1",
+    "borsh": "^0.4.0",
+    "buffer-layout": "^1.2.1",
+    "eventemitter3": "^4.0.7",
+    "lodash": "^4.17.21",
+    "pullstate": "^1.22.1",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "react-scripts": "4.0.3",
+    "react-toastify": "8.0.3",
+    "reactstrap": "^8.9.0",
+    "web-vitals": "^1.0.1"
+  },
+  "scripts": {
+    "start": "PORT=3000 react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

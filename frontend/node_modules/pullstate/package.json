@@ -1,0 +1,81 @@
+{
+  "name": "pullstate",
+  "version": "1.23.0",
+  "description": "Simple state stores using immer and React hooks",
+  "main": "dist/index.js",
+  "module": "dist/index.es.js",
+  "esnext": "dist/index.es.js",
+  "main:umd": "dist/pullstate.umd.js",
+  "main:umd:min": "dist/pullstate.umd.min.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate-typedoc": "typedoc src/index.ts",
+    "test": "jest",
+    "test-watch": "jest --watch",
+    "clean": "rimraf ./dist",
+    "build": "npm run clean && rollup -c",
+    "uglify": "terser ./dist/index.js -o ./dist/index.js",
+    "check-size": "minified-size ./dist/index.es.js",
+    "check-size-cjs": "minified-size ./dist/index.js",
+    "benchmark-all": "cross-env TS_NODE_PROJECT=./test/tsconfig.json node -r ts-node/register --max-old-space-size=4096  test/benchmark/all.ts",
+    "benchmark-async-argument": "cross-env TS_NODE_PROJECT=./test/tsconfig.json node -r ts-node/register --max-old-space-size=4096  test/benchmark/benchmark-async-argument.ts",
+    "benchmark-destructuring": "cross-env TS_NODE_PROJECT=./test/tsconfig.json node -r ts-node/register --max-old-space-size=4096  test/benchmark/benchmark-destructuring.ts",
+    "benchmark-all-immer": "cross-env TS_NODE_PROJECT=./test/tsconfig.json node -r ts-node/register --max-old-space-size=4096  test/benchmark/benchmark-all-immer.ts",
+    "benchmark-immer-without-stores": "cross-env TS_NODE_PROJECT=./test/tsconfig.json node -r ts-node/register --max-old-space-size=4096  test/benchmark/benchmark-immer-without-stores.ts",
+    "benchmark-immer-with-stores": "cross-env TS_NODE_PROJECT=./test/tsconfig.json node -r ts-node/register --max-old-space-size=4096 test/benchmark/benchmark-immer-with-stores.ts"
+  },
+  "keywords": [
+    "immer",
+    "state",
+    "store",
+    "react",
+    "hooks"
+  ],
+  "author": "Paul Myburgh",
+  "license": "MIT",
+  "dependencies": {
+    "fast-deep-equal": "^3.1.3",
+    "immer": "^9.0.6"
+  },
+  "repository": "https://github.com/lostpebble/pullstate",
+  "devDependencies": {
+    "@testing-library/jest-dom": "^4.1.0",
+    "@testing-library/react": "^9.1.4",
+    "@types/benchmark": "^1.0.31",
+    "@types/jest": "23.3.10",
+    "@types/lodash": "^4.14.121",
+    "@types/react": "16.9.21",
+    "@types/react-dom": "16.9.5",
+    "benchmark": "^2.1.4",
+    "cross-env": "^5.2.0",
+    "in-publish": "^2.0.0",
+    "jest": "24.8.0",
+    "jest-dom": "^4.0.0",
+    "jest-environment-jsdom": "24.8.0",
+    "jest-environment-jsdom-global": "1.2.0",
+    "js-beautify": "^1.9.0-beta5",
+    "lodash": "^4.17.15",
+    "prettier": "^2.0.5",
+    "react-test-renderer": "^16.8.3",
+    "@rollup/plugin-commonjs": "^11.0.2",
+    "@rollup/plugin-typescript": "^4.1.2",
+    "@rollup/plugin-node-resolve": "^9.0.0",
+    "rollup-plugin-typescript2": "^0.28.0",
+    "rollup-plugin-terser": "^7.0.2",
+    "rollup": "^2.32.0",
+    "terser": "^3.16.1",
+    "ts-jest": "^24.0.2",
+    "ts-loader": "^6.0.2",
+    "ts-node": "^8.2.0",
+    "typedoc": "^0.19.2",
+    "typescript": "4.0.3",
+    "webpack": "^4.44.2",
+    "webpack-cli": "^3.3.12"
+  },
+  "peerDependencies": {
+    "react": "^16.12.0 || ^17.0.0"
+  }
+}
