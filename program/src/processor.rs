@@ -175,7 +175,7 @@ impl Fund {
         fund_data.signer_nonce = signer_nonce;
         fund_data.block_deposits = false;
         fund_data.min_amount = min_amount;
-        fund_data.performance_fee_percentage = I80F48::from_num(performance_fee_bps).checked_div(I80F48::from_num(100));
+        fund_data.performance_fee_percentage = I80F48::from_num(performance_fee_bps).checked_div(I80F48::from_num(100)).unwrap();
         fund_data.current_index = I80F48!(1.00);
         fund_data.manager_account = *manager_ai.key;
         fund_data.usdc_vault_key = *fund_usdc_vault_ai.key;

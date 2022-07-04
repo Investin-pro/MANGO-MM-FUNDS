@@ -34,19 +34,10 @@ macro_rules! impl_loadable {
     };
 }
 
-#[repr(packed)] 
-#[derive(IntoPrimitive, TryFromPrimitive)] 
- pub enum InvestmentStatus { 
-     Inactive = 0, 
-     PendingDeposit, //1
-     Active, //2
-     PendingWithdraw, //3
-     PendingForceSettlement, //4
-     ReadyToClaim //5
- }
+
 
 #[repr(packed)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy)] 
 pub struct FundData {
 
     pub is_initialized: bool,
@@ -131,6 +122,17 @@ pub struct InvestorData {
 
 }
 impl_loadable!(InvestorData);
+
+#[repr(u8)] 
+#[derive(IntoPrimitive, TryFromPrimitive, PartialEq, Debug, Clone, Copy)] 
+ pub enum InvestmentStatus { 
+     Inactive = 0, 
+     PendingDeposit, //1
+     Active, //2
+     PendingWithdraw, //3
+     PendingForceSettlement, //4
+     ReadyToClaim //5
+ }
 
 impl Sealed for InvestorData {}
 impl IsInitialized for InvestorData {
