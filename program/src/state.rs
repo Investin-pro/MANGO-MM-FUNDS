@@ -7,7 +7,7 @@ use solana_program::pubkey::Pubkey;
 use std::cell::{Ref, RefMut};
 use std::mem::size_of;
 use mango::state::{MangoAccount, MangoCache, MangoGroup, PerpMarket, HealthCache, HealthType, MAX_PAIRS, QUOTE_INDEX, MAX_TOKENS};
-
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 
 pub trait Loadable: Pod {
@@ -34,6 +34,16 @@ macro_rules! impl_loadable {
     };
 }
 
+#[repr(packed)] 
+#[derive(IntoPrimitive, TryFromPrimitive)] 
+ pub enum InvestmentStatus { 
+     Inactive = 0, 
+     PendingDeposit, //1
+     Active, //2
+     PendingWithdraw, //3
+     PendingForceSettlement, //4
+     ReadyToClaim //5
+ }
 
 #[repr(packed)]
 #[derive(Clone, Copy)]
@@ -99,7 +109,7 @@ pub struct ForceSettleData {
 #[derive(Clone, Copy)]
 pub struct InvestorData {
     pub is_initialized: bool,
-    pub investment_status: u8, //1->pending_deposit 2->active_deposit 3->withdraw_requested 4->withdraw_processed
+    pub investment_status: InvestmentStatus,
     pub padding: [u8; 6],
 
     /// The Initial deposit (in USDC tokens)

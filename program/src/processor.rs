@@ -26,7 +26,7 @@ use spl_associated_token_account::instruction::{self, AssociatedTokenAccountInst
 
 use crate::{state::Loadable};
 use crate::instruction::FundInstruction;
-use crate::state::{FundData, InvestorData};
+use crate::state::{FundData, InvestorData, InvestmentStatus};
 
 use mango::ids::{mngo_token, luna_spot_market};
 use mango::instruction::{cancel_all_perp_orders, consume_events, place_perp_order, withdraw, set_delegate, cancel_all_spot_orders};
@@ -175,7 +175,7 @@ impl Fund {
         fund_data.signer_nonce = signer_nonce;
         fund_data.block_deposits = false;
         fund_data.min_amount = min_amount;
-        fund_data.performance_fee_percentage = I80F48::from_num(performance_fee_bps / 100);
+        fund_data.performance_fee_percentage = I80F48::from_num(performance_fee_bps).checked_div(I80F48::from_num(100));
         fund_data.current_index = I80F48!(1.00);
         fund_data.manager_account = *manager_ai.key;
         fund_data.usdc_vault_key = *fund_usdc_vault_ai.key;
@@ -238,7 +238,7 @@ impl Fund {
 
         // update investor acc
         investor_data.is_initialized = true;
-        investor_data.investment_status = 1;
+        investor_data.investment_status = InvestmentStatus::PendingDeposit;
         investor_data.amount = amount;
         investor_data.start_index = fund_data.current_index;
         investor_data.returns = amount;
@@ -248,7 +248,6 @@ impl Fund {
         Ok(())
     }
 
-    
     pub fn process_deposits(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
@@ -295,10 +294,10 @@ impl Fund {
         for i in 0..investors_ais.len() {
             msg!("Investor ai:: {:?} of {}", investors_ais[i], investors_ais.len());
             let mut investor_data = InvestorData::load_mut_checked(&investors_ais[i], program_id)?;
-            assert!(investor_data.investment_status == 1 && investor_data.fund == *fund_pda_ai.key);
+            assert!(investor_data.investment_status == InvestmentStatus::PendingDeposit && investor_data.fund == *fund_pda_ai.key);
             deposit_amount = deposit_amount.checked_add(investor_data.amount).unwrap();
             investor_data.start_index = fund_data.current_index;
-            investor_data.investment_status = 2;
+            investor_data.investment_status = InvestmentStatus::Active;
             fund_data.no_of_investments = fund_data.no_of_investments.checked_add(1).unwrap();
         }
 
@@ -379,17 +378,16 @@ impl Fund {
         assert_eq!(investor_data.owner, *investor_ai.key);
         assert_eq!(investor_data.fund,*fund_pda_ai.key);
         assert!(investor_ai.is_signer);
-        assert_eq!(investor_data.investment_status, 2);
+        assert_eq!(investor_data.investment_status, InvestmentStatus::Active);
         assert!(!fund_data.paused_for_settlement);
         let ts_check = Clock::get()?.unix_timestamp.checked_rem(WEEK_SECONDS).unwrap();
         assert!( ts_check <= DAY_SECONDS || ts_check >= (DAY_SECONDS + (12*HOUR_SECONDS))); //To exclude 00:00 to 12:00 UTC Every Friday
 
-        investor_data.investment_status = 3;
+        investor_data.investment_status = InvestmentStatus::PendingWithdraw;
         fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_add(1).unwrap();
 
         Ok(())
     }
-
 
     // investor withdraw
     pub fn process_withdraws(
@@ -438,7 +436,7 @@ impl Fund {
             true,
         )?;
 
-        let withdraw_amount = compute_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data, 3)?;
+        let withdraw_amount = compute_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data, InvestmentStatus::PendingWithdraw)?;
         msg!("Withdrawing {:?} from mango", withdraw_amount);
         let open_orders_pubkeys = open_orders_ais.clone().map(|a| *a.key);
 
@@ -545,9 +543,6 @@ impl Fund {
         
         Ok(())
     }
-
-
-
 
     pub fn init_force_settle(
         program_id: &Pubkey,
@@ -874,7 +869,7 @@ impl Fund {
             true,
         )?;
 
-        let withdraw_amount = compute_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data, 4)?;
+        let withdraw_amount = compute_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data, InvestmentStatus::PendingForceSettlement)?;
 
         let open_orders_pubkeys = open_orders_ais.clone().map(|a| *a.key);
 
@@ -933,10 +928,6 @@ impl Fund {
         Ok(())
     }
 
-
-
-
-
     pub fn investor_withdraw(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
@@ -960,7 +951,7 @@ impl Fund {
         assert!(investor_ai.is_signer);
         assert!(investor_data.is_initialized());
         assert_eq!(investor_data.fund, *fund_pda_ai.key);
-        assert!(investor_data.investment_status == 5 || investor_data.investment_status == 1);
+        assert!(investor_data.investment_status == InvestmentStatus::ReadyToClaim || investor_data.investment_status == InvestmentStatus::PendingDeposit);
 
         assert_eq!(*token_program_ai.key, spl_token::id());
         assert_eq!(fund_data.usdc_vault_key, *fund_vault_ai.key);
@@ -991,7 +982,7 @@ impl Fund {
 
 
         // update balances
-        if investor_data.investment_status == 1{
+        if investor_data.investment_status == InvestmentStatus::PendingDeposit {
             fund_data.pending_deposits = fund_data.pending_deposits.checked_sub(investor_data.returns).unwrap();
         } else {
             fund_data.pending_withdrawals = fund_data.pending_withdrawals.checked_sub(investor_data.returns).unwrap();
@@ -1093,8 +1084,6 @@ impl Fund {
 
         Ok(())
     }
-
-    
 
     pub fn set_mango_delegate(program_id: &Pubkey, accounts: &[AccountInfo]) -> Result<(), ProgramError> {
         const NUM_FIXED: usize = 6;
@@ -1381,7 +1370,7 @@ pub fn compute_withdraw_amount(
     investors_ais: &[AccountInfo],
     fund_pda_ai: &AccountInfo,
     fund_data: &mut FundData,
-    check_status: u8
+    check_status: InvestmentStatus
 ) -> Result<u64, ProgramError> {
     let mut withdraw_amount:u64 = 0;
     for i in 0..investors_ais.len() {
@@ -1405,11 +1394,11 @@ pub fn compute_withdraw_amount(
         withdraw_amount = withdraw_amount.checked_add(returns).unwrap();
         fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_sub(1).unwrap();
         fund_data.no_of_investments = fund_data.no_of_investments.checked_sub(1).unwrap();
-        if check_status == 4 {
+        if check_status == InvestmentStatus::PendingForceSettlement {
             fund_data.no_of_settle_withdrawals = fund_data.no_of_settle_withdrawals.checked_sub(1).unwrap();
         }   
         investor_data.returns = returns;
-        investor_data.investment_status = 5;
+        investor_data.investment_status = InvestmentStatus::ReadyToClaim;
     }
     Ok(withdraw_amount)
 }
@@ -1423,11 +1412,11 @@ pub fn compute_cumulative_share(
     let mut withdraw_amount = I80F48!(0);
     for i in 0..investors_ais.len() {
         let mut investor_data = InvestorData::load_mut_checked(&investors_ais[i], program_id)?;
-        assert!(investor_data.investment_status == 3 && investor_data.fund == *fund_pda_ai.key);
+        assert!(investor_data.investment_status == InvestmentStatus::PendingWithdraw && investor_data.fund == *fund_pda_ai.key);
         let performance:I80F48 = fund_data.current_index.checked_div(investor_data.start_index).unwrap();
         let returns = I80F48::from_num(investor_data.amount).checked_mul(performance).unwrap();
         withdraw_amount = withdraw_amount.checked_add(returns).unwrap();
-        investor_data.investment_status = 4;
+        investor_data.investment_status = InvestmentStatus::PendingForceSettlement;
         fund_data.no_of_settle_withdrawals = fund_data.no_of_settle_withdrawals.checked_add(1).unwrap();
     }
     Ok((withdraw_amount.checked_div(fund_data.total_amount).unwrap()))
