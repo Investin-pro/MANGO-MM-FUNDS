@@ -28,7 +28,7 @@ use crate::{state::Loadable};
 use crate::instruction::FundInstruction;
 use crate::state::{FundData, InvestorData};
 
-use mango::ids::{mngo_token, luna_spot_market};
+use mango::ids::{mngo_token};
 use mango::instruction::{cancel_all_perp_orders, consume_events, place_perp_order, withdraw, set_delegate, cancel_all_spot_orders};
 use mango::state::{MangoAccount, MangoCache, MangoGroup, PerpMarket, HealthCache, HealthType, MAX_PAIRS, QUOTE_INDEX};
 use mango::matching::{Side, OrderType, ExpiryType};
@@ -127,6 +127,7 @@ impl Fund {
             &[&[&manager_ai.key.to_bytes(), bytes_of(&signer_nonce)]]
         )?;
 
+
         invoke_signed(
             &mango::instruction::create_mango_account(
                 mango_program_ai.key, 
@@ -146,7 +147,9 @@ impl Fund {
                 manager_ai.clone()
             ],
             &[&[&manager_ai.key.to_bytes(), bytes_of(&signer_nonce)]]
-        );
+        )?;
+
+        
 
 
         invoke_signed(
@@ -166,7 +169,7 @@ impl Fund {
             ],
             &[&[&manager_ai.key.to_bytes(), bytes_of(&signer_nonce)]]
 
-        );
+        )?;
 
 
         let mut fund_data = FundData::load_mut(fund_pda_ai)?;

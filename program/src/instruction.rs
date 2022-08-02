@@ -1,11 +1,14 @@
 use arrayref::{array_ref, array_refs};
 use mango::matching::{OrderType, Side};
 use num_enum::TryFromPrimitive;
+use serde::{Serialize, Deserialize};
+use solana_program::{pubkey::Pubkey, instruction::{Instruction, AccountMeta}, program_error::ProgramError, account_info::Account};
 
 use crate::processor::Fund;
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+
 pub enum FundInstruction {
     
     Initialize {
@@ -42,7 +45,7 @@ pub enum FundInstruction {
 
     ForceWithdraws, 
 
-    ResetMangoDelegate
+     ResetMangoDelegate
     
 }
 
@@ -89,4 +92,36 @@ impl FundInstruction {
             }
         })
     }
+    pub fn pack(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
+}
+
+pub fn initialize(
+    program_id: &Pubkey,
+    manager_pk: &Pubkey,
+    fund_pda_pk: &Pubkey,
+    fund_usdc_vault_pk: &Pubkey,
+    mango_program_pk: &Pubkey,
+    mango_group_pk: &Pubkey, 
+    mango_account_pk: &Pubkey,
+    delegate_pk: &Pubkey,
+    system_program_pk: &Pubkey,
+    min_amount: u64,
+    performance_fee_bps: u64
+) -> Result<Instruction, ProgramError> {
+    let accounts = vec![
+        AccountMeta::new(*manager_pk, true),
+        AccountMeta::new(*fund_pda_pk, false),
+        AccountMeta::new(*fund_usdc_vault_pk, false),
+        AccountMeta::new_readonly(*mango_program_pk, false),
+        AccountMeta::new(*mango_group_pk, false),
+        AccountMeta::new(*mango_account_pk, false),
+        AccountMeta::new_readonly(*delegate_pk, false),
+        AccountMeta::new_readonly(*system_program_pk, false)
+    ];
+
+    let instr = FundInstruction::Initialize { min_amount, performance_fee_bps};
+    let data = instr.pack();
+    Ok(Instruction { program_id: *program_id, accounts, data })
 }

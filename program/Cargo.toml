@@ -25,7 +25,8 @@ num-traits = "0.2"
 num_enum = "^0.5.1"
 thiserror = "^1.0.24"
 spl-token = { version = "^3.0.0", features = ["no-entrypoint"] }
-mango = { version = "^3.4.3", git = "https://github.com/blockworks-foundation/mango-v3.git", default-features=false, features = ["no-entrypoint", "client"], branch="main" }
+mango = { version = "^3.5.1", git = "https://github.com/blockworks-foundation/mango-v3.git", default-features=false, features = ["no-entrypoint", "client"], branch="main" }
+mango-common = {version = "3.0.0", git = "https://github.com/blockworks-foundation/mango-v3", branch = "main" }
 spl-associated-token-account = { version = "1.0.5", features = ["no-entrypoint"] }
 serum_dex = { rev = "7f55a5ef5f7937b74381a3124021a261cd7d7283", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
 
@@ -34,6 +35,11 @@ serum_dex = { rev = "7f55a5ef5f7937b74381a3124021a261cd7d7283", git = "https://g
 
 
 [dev-dependencies]
+solana-sdk = ">=1.9.0"
+solana-program-test = ">=1.9.0"
+solana-logger = ">=1.9.0"
+tarpc = { version = "^0.26.2", features = ["full"] }
+rand = "0.8.4"
 
 
 [lib]
