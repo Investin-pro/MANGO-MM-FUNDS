@@ -1,5 +1,6 @@
 use bytemuck::{from_bytes, from_bytes_mut, Pod, Zeroable};
 use fixed::types::I80F48;
+use num_enum::TryFromPrimitive;
 use solana_program::account_info::AccountInfo;
 use solana_program::program_error::ProgramError;
 use solana_program::program_pack::{IsInitialized, Sealed};
@@ -36,8 +37,9 @@ macro_rules! impl_loadable {
 }
 
 
+
 #[repr(packed)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy)] 
 pub struct FundData {
 
     pub is_initialized: bool,
@@ -100,7 +102,7 @@ pub struct ForceSettleData {
 #[derive(Clone, Copy)]
 pub struct InvestorData {
     pub is_initialized: bool,
-    pub investment_status: u8, //1->pending_deposit 2->active_deposit 3->withdraw_requested 4->withdraw_processed
+    pub investment_status: InvestmentStatus,
     pub padding: [u8; 6],
 
     /// The Initial deposit (in USDC tokens)
@@ -122,6 +124,17 @@ pub struct InvestorData {
 
 }
 impl_loadable!(InvestorData);
+
+#[repr(u8)] 
+#[derive(IntoPrimitive, TryFromPrimitive, PartialEq, Debug, Clone, Copy)] 
+ pub enum InvestmentStatus { 
+     Inactive = 0, 
+     PendingDeposit, //1
+     Active, //2
+     PendingWithdraw, //3
+     PendingForceSettlement, //4
+     ReadyToClaim //5
+ }
 
 impl Sealed for InvestorData {}
 impl IsInitialized for InvestorData {
