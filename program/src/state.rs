@@ -126,7 +126,7 @@ pub struct InvestorData {
 impl_loadable!(InvestorData);
 
 #[repr(u8)] 
-#[derive(IntoPrimitive, TryFromPrimitive, PartialEq, Debug, Clone, Copy)] 
+#[derive(PartialEq, Debug, Clone, Copy)] 
  pub enum InvestmentStatus { 
      Inactive = 0, 
      PendingDeposit, //1
