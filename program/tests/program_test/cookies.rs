@@ -8,6 +8,7 @@ use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
 
 use mango::{ids::*, matching::*, queue::*, state::*, utils::*, instruction};
+use spl_associated_token_account::tools::account;
 
 use crate::*;
 
@@ -413,8 +414,12 @@ impl InvestinFundCookie {
 
     
         let fund_usdc_vault_pk = test.create_token_account(&investin_fund_pk, &test.mints[1].pubkey.unwrap()).await;
-        let mango_seeds: &[&[u8]] = &[&mango_group_cookie.address.as_ref(), &investin_fund_pk.as_ref(), &[0]];
+        let account_num :u64 = 0;
+        let mango_seeds: &[&[u8]] = &[&mango_group_cookie.address.as_ref(), &investin_fund_pk.as_ref(), &account_num.to_le_bytes()];
         let (mango_account_pk, _) = Pubkey::find_program_address(mango_seeds, &mango_program_id);
+        println!("derived mango seeds {:?}", mango_seeds);
+        println!("program_id {:?}", mango_program_id);
+        println!("derived mango account {:?}", mango_account_pk);
         let instructions = [mm::instruction::initialize(
             &investin_program_id, 
             &manager_pk, 

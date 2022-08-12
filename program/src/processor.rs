@@ -100,10 +100,10 @@ impl Fund {
         assert!(manager_ai.is_signer);
 
         let fund_usdc_vault_data = parse_token_account(fund_usdc_vault_ai)?;
-        // assert!(fund_usdc_vault_data.mint == usdc_token::id() && fund_usdc_vault_data.owner == *fund_pda_ai.key);
-        // assert_eq!(mango_v3::id(), *mango_program_ai.key);
-        // assert!(min_amount >= 10000000);
-        // assert!(performance_fee_bps >= 100 && performance_fee_bps <= 8000);
+        assert!(fund_usdc_vault_data.mint == usdc_token::id() && fund_usdc_vault_data.owner == *fund_pda_ai.key);
+        assert_eq!(mango_v3::id(), *mango_program_ai.key);
+        assert!(min_amount >= 10000000);
+        assert!(performance_fee_bps >= 100 && performance_fee_bps <= 8000);
 
         let (fund_pda, signer_nonce) = Pubkey::find_program_address(&[&manager_ai.key.to_bytes()], program_id);
 

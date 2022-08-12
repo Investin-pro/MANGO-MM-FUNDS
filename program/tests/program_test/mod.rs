@@ -3,6 +3,7 @@ use std::mem::size_of;
 
 use bincode::deserialize;
 use fixed::types::I80F48;
+use mm::processor::{usdc_token, mango_v3};
 use serum_dex::instruction::NewOrderInstructionV3;
 use solana_program::entrypoint::ProgramResult;
 use solana_program::{
@@ -132,7 +133,7 @@ impl MangoProgramTest {
     #[allow(dead_code)]
     pub async fn start_new(config: &MangoProgramTestConfig) -> Self {
         let investin_program_id = Pubkey::new_unique();
-        let mango_program_id = Pubkey::new_unique();
+        let mango_program_id = mango_v3::ID;
         let serum_program_id = Pubkey::new_unique();
 
         // Predefined mints, maybe can even add symbols to them
@@ -264,7 +265,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 0 as f64,
                 quote_lot: 0 as f64,
-                pubkey: None,
+                pubkey: Some(usdc_token::ID),
             }, // symbol: "USDC".to_string()
         ];
 
