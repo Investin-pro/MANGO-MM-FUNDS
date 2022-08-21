@@ -83,7 +83,10 @@ pub struct FundData {
     // Delegate for Manager to call place/cancel
     pub delegate: Pubkey,
 
-    pub force_settle: ForceSettleData
+    pub force_settle: ForceSettleData,
+
+    pub padding: [u8; 160]
+
 
 }
 impl_loadable!(FundData);
@@ -95,6 +98,9 @@ pub struct ForceSettleData {
     pub ready_for_settlement: bool,
     pub spot: [bool; MAX_PAIRS],
     pub perps: [bool; MAX_PAIRS],
+    pub padding: u8,
+    pub investors_share: I80F48,
+    pub usdc_before: I80F48
 } impl_loadable!(ForceSettleData);
 
 

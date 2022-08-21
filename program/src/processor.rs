@@ -1,3 +1,4 @@
+use std::u64;
 use std::{mem::size_of, char::MAX, collections::btree_map::OccupiedEntry};
 use std::num::NonZeroU64;
 
@@ -70,6 +71,7 @@ pub const INITIAL_INDEX: I80F48 = I80F48!(1_000_000);
 pub const WEEK_SECONDS: i64 = 604800;
 pub const DAY_SECONDS: i64 = 86400;
 pub const HOUR_SECONDS: i64 = 3600;
+pub const ONE_I80F48: I80F48 = I80F48!(1);
 
 
 pub struct Fund {}
@@ -127,13 +129,14 @@ impl Fund {
             &[&[&manager_ai.key.to_bytes(), bytes_of(&signer_nonce)]]
         )?;
 
-        let account_num: u64 = 0;
-        let mango_account_seeds: &[&[u8]] =
-            &[&mango_group_ai.key.as_ref(), fund_pda_ai.key.as_ref(), &account_num.to_le_bytes()];
-        let m_a = Pubkey::find_program_address(mango_account_seeds, mango_program_ai.key);
-        msg!("seeds {:?}", mango_account_seeds);
-        msg!("program_id {:?}", *mango_program_ai.key);
-        msg!("mango account: {:?}", m_a);
+        // let account_num: u64 = 0;
+        // let mango_account_seeds: &[&[u8]] =
+        //     &[&mango_group_ai.key.as_ref(), fund_pda_ai.key.as_ref(), &[0]];
+        //     // &[&mango_group_ai.key.as_ref(), fund_pda_ai.key.as_ref(), &account_num.to_le_bytes()];
+        // let m_a = Pubkey::find_program_address(mango_account_seeds, mango_program_ai.key);
+        // msg!("seeds {:?}", mango_account_seeds);
+        // msg!("program_id {:?}", *mango_program_ai.key);
+        // msg!("mango account: {:?}", m_a);
 
 
         invoke_signed(
@@ -438,7 +441,7 @@ impl Fund {
 
     
         
-        update_amount_and_performance(
+        let (_, usdc_value) = update_amount_and_performance(
             &mut fund_data,
             mango_account_ai,
             mango_group_ai,
@@ -448,7 +451,7 @@ impl Fund {
             true,
         )?;
 
-        let withdraw_amount = compute_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data, InvestmentStatus::PendingWithdraw)?;
+        let withdraw_amount = compute_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data)?;
         msg!("Withdrawing {:?} from mango", withdraw_amount);
         let open_orders_pubkeys = open_orders_ais.clone().map(|a| *a.key);
 
@@ -522,12 +525,11 @@ impl Fund {
         assert_eq!(mango_v3::id(), *mango_program_ai.key);
         assert_eq!(*mango_account_ai.key, fund_data.mango_account);
         let ts_check = Clock::get()?.unix_timestamp.checked_rem(WEEK_SECONDS).unwrap();
-        // assert!((ts_check >= DAY_SECONDS + (10*HOUR_SECONDS)) && (ts_check <= (DAY_SECONDS + (12*HOUR_SECONDS)))); //Only from 10:00 to 12:00 UTC Every Friday
+        assert!((ts_check >= DAY_SECONDS + (10*HOUR_SECONDS)) && (ts_check <= (DAY_SECONDS + (12*HOUR_SECONDS)))); //Only from 10:00 to 12:00 UTC Every Friday
         assert!(!fund_data.paused_for_settlement);
         fund_data.paused_for_settlement = true;
 
 
-        let signer_nonce = fund_data.signer_nonce;
         let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
         let signer_seeds = [
             &manager_account.as_ref(),
@@ -579,7 +581,7 @@ impl Fund {
         assert_eq!(*mango_account_ai.key, fund_data.mango_account);
         assert!(fund_data.paused_for_settlement);
         
-        let mut mango_active_assets = update_amount_and_performance(
+        let (mut mango_active_assets, usdc_val)  = update_amount_and_performance(
             &mut fund_data,
             mango_account_ai,
             mango_group_ai,
@@ -590,10 +592,31 @@ impl Fund {
         )?;
 
         fund_data.force_settle.share = fund_data.force_settle.share.checked_add(compute_cumulative_share(program_id, investors_ais, fund_pda_ai, &mut fund_data)?).unwrap();
-        fund_data.force_settle.spot = mango_active_assets.spot;
-        fund_data.force_settle.perps = mango_active_assets.perps;
-
+        
+        
         if fund_data.no_of_pending_withdrawals == fund_data.no_of_settle_withdrawals {
+            fund_data.force_settle.usdc_before = usdc_val
+                .checked_mul(
+                    ONE_I80F48
+                    .checked_sub(fund_data.force_settle.share)
+                    .unwrap()
+                )
+                .unwrap();
+
+            if usdc_val.is_negative() {
+                fund_data.force_settle.investors_share =  fund_data.force_settle.share
+                    .checked_add(
+                        usdc_val
+                        .checked_abs()
+                        .unwrap()
+                        .checked_div(fund_data.total_amount)
+                        .unwrap()
+                    ).unwrap();
+            } else {
+                fund_data.force_settle.investors_share = fund_data.force_settle.share
+            }
+            fund_data.force_settle.spot = mango_active_assets.spot;
+            fund_data.force_settle.perps = mango_active_assets.perps;
             fund_data.force_settle.ready_for_settlement = true;
         }
 
@@ -871,7 +894,7 @@ impl Fund {
         assert_eq!(fund_data.check_force_settled()?, (true, true));
 
         
-        update_amount_and_performance(
+        let (_, usdc_value) = update_amount_and_performance(
             &mut fund_data,
             mango_account_ai,
             mango_group_ai,
@@ -881,7 +904,7 @@ impl Fund {
             true,
         )?;
 
-        let withdraw_amount = compute_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data, InvestmentStatus::PendingForceSettlement)?;
+        let withdraw_amount = compute_force_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data, usdc_value)?;
 
         let open_orders_pubkeys = open_orders_ais.clone().map(|a| *a.key);
 
@@ -1051,7 +1074,11 @@ impl Fund {
             true,
         )?;
 
-        let withdraw_amount = I80F48::to_num(fund_data.performance_fee);
+        let withdraw_amount = fund_data.performance_fee
+            .checked_floor()
+            .unwrap()
+            .checked_to_num()
+            .unwrap();
         fund_data.performance_fee = I80F48!(0);
         let signer_nonce = fund_data.signer_nonce;
         let signer_seeds = [
@@ -1283,7 +1310,7 @@ pub fn update_amount_and_performance(
     mango_program_ai: &AccountInfo,
     open_orders_ais: &[AccountInfo; MAX_PAIRS],
     update_perf: bool,
-) -> Result<mango::state::UserActiveAssets, ProgramError> {
+) -> Result<(mango::state::UserActiveAssets, I80F48), ProgramError> {
     
     assert_eq!(*mango_account_ai.key, fund_data.mango_account);
 
@@ -1329,13 +1356,11 @@ pub fn update_amount_and_performance(
                 .unwrap();
         }
         // adjust for manager performance fee
-        fund_data.performance_fee = I80F48::to_num(
-            perf
-                .checked_div(fund_data.current_index)
-                .unwrap()
-                .checked_mul(fund_data.performance_fee)
-                .unwrap(),
-        );
+        fund_data.performance_fee = perf
+            .checked_div(fund_data.current_index)
+            .unwrap()
+            .checked_mul(fund_data.performance_fee)
+            .unwrap();
         fund_data.current_index = perf;
     }
 
@@ -1344,10 +1369,15 @@ pub fn update_amount_and_performance(
     msg!("updated amount: {:?}", fund_data.total_amount);
     msg!("updated perf {:?}", fund_data.current_index);
 
-    Ok(mango::state::UserActiveAssets::new(
-        &mango_group,
-        &mango_account,
-        vec![(mango::state::AssetType::Token, QUOTE_INDEX)],
+    Ok((mango::state::UserActiveAssets::new(
+            &mango_group,
+            &mango_account,
+            vec![(mango::state::AssetType::Token, QUOTE_INDEX)],
+        ), 
+        mango_account.get_net(
+            &mango_cache.root_bank_cache[QUOTE_INDEX], 
+            QUOTE_INDEX
+        )
     ))
 }
 
@@ -1382,37 +1412,115 @@ pub fn compute_withdraw_amount(
     investors_ais: &[AccountInfo],
     fund_pda_ai: &AccountInfo,
     fund_data: &mut FundData,
-    check_status: InvestmentStatus
 ) -> Result<u64, ProgramError> {
     let mut withdraw_amount:u64 = 0;
     for i in 0..investors_ais.len() {
         let mut investor_data = InvestorData::load_mut_checked(&investors_ais[i], program_id)?;
-        assert!((investor_data.investment_status == check_status) && investor_data.fund == *fund_pda_ai.key);
+        assert!((investor_data.investment_status == InvestmentStatus::PendingWithdraw) && investor_data.fund == *fund_pda_ai.key);
         let performance:I80F48 = fund_data.current_index.checked_div(investor_data.start_index).unwrap();
-        let mut returns:u64 = I80F48::to_num(I80F48::from_num(investor_data.amount).checked_mul(performance).unwrap());
-        if performance > I80F48!(1) {
-            let performance_fee = I80F48::from_num(
-                    returns.checked_sub(
-                        investor_data.amount
-                    ).unwrap()
-                ).checked_mul(
-                    fund_data.performance_fee_percentage.checked_div(
-                        I80F48!(100)
-                    ).unwrap()
-                ).unwrap();
-            returns = returns.checked_sub(I80F48::to_num(performance_fee)).unwrap();
-            fund_data.performance_fee = fund_data.performance_fee.checked_add(performance_fee).unwrap();
-        }
-        withdraw_amount = withdraw_amount.checked_add(returns).unwrap();
+        let returns = I80F48::from_num(investor_data.amount)
+            .checked_mul(performance)
+            .unwrap()
+            .checked_floor()
+            .unwrap()
+            .checked_to_num()
+            .unwrap();
+
+        investor_data.returns = compute_returns(&mut investor_data, fund_data, returns)?;
+
+        withdraw_amount = withdraw_amount.checked_add(investor_data.returns).unwrap();
         fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_sub(1).unwrap();
         fund_data.no_of_investments = fund_data.no_of_investments.checked_sub(1).unwrap();
-        if check_status == InvestmentStatus::PendingForceSettlement {
-            fund_data.no_of_settle_withdrawals = fund_data.no_of_settle_withdrawals.checked_sub(1).unwrap();
-        }   
-        investor_data.returns = returns;
         investor_data.investment_status = InvestmentStatus::ReadyToClaim;
     }
     Ok(withdraw_amount)
+}
+
+pub fn compute_returns(
+    investor_data: &mut InvestorData,
+    fund_data: &mut FundData,
+    returns: u64
+) -> Result<u64, ProgramError> {
+    
+    if returns > investor_data.amount {
+        let performance_fee = I80F48::from_num(
+                returns
+                .checked_sub(investor_data.amount)
+                .unwrap()
+            )
+            .checked_mul(fund_data.performance_fee_percentage)
+            .unwrap()
+            .checked_div(I80F48!(100))
+            .unwrap();
+        fund_data.performance_fee = fund_data.performance_fee
+            .checked_add(performance_fee)
+            .unwrap();
+        Ok(
+            returns
+                .checked_sub(
+                    performance_fee
+                    .checked_floor()
+                    .unwrap()
+                    .checked_to_num()
+                    .unwrap()
+                )
+                .unwrap()
+        )
+    } else {
+        Ok(returns)
+    }
+
+}
+
+pub fn compute_force_withdraw_amount(
+    program_id: &Pubkey,
+    investors_ais: &[AccountInfo],
+    fund_pda_ai: &AccountInfo,
+    fund_data: &mut FundData,
+    usdc_value: I80F48,
+) -> Result<u64, ProgramError> {
+    let mut withdraw_pool_amount:u64 = usdc_value
+        .checked_sub(
+            fund_data.force_settle.usdc_before
+            .checked_abs()
+            .unwrap()
+        )
+        .unwrap()
+        .checked_floor()
+        .unwrap()
+        .checked_to_num::<u64>()
+        .unwrap();
+    
+    // let expected_withdraw_amount = fund_data.total_amount.checked_mul(fund_data.force_settle.share).unwrap();
+    for i in 0..investors_ais.len() {
+        let mut investor_data = InvestorData::load_mut_checked(&investors_ais[i], program_id)?;
+        assert!((investor_data.investment_status == InvestmentStatus::PendingForceSettlement) && investor_data.fund == *fund_pda_ai.key);
+        let performance:I80F48 = fund_data.current_index
+            .checked_div(investor_data.start_index)
+            .unwrap();
+        let investor_share = I80F48::from_num(investor_data.amount)
+            .checked_mul(performance)
+            .unwrap()
+            .checked_div(fund_data.total_amount)
+            .unwrap()
+            .checked_div(fund_data.force_settle.investors_share)
+            .unwrap();
+
+        let returns = I80F48::from_num(withdraw_pool_amount)
+            .checked_mul(investor_share)
+            .unwrap()
+            .checked_floor()
+            .unwrap()
+            .checked_to_num::<u64>()
+            .unwrap();
+
+        investor_data.returns = compute_returns(&mut investor_data, fund_data, returns)?;
+        fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_sub(1).unwrap();
+        fund_data.no_of_investments = fund_data.no_of_investments.checked_sub(1).unwrap();
+        fund_data.no_of_settle_withdrawals = fund_data.no_of_settle_withdrawals.checked_sub(1).unwrap();
+        investor_data.investment_status = InvestmentStatus::ReadyToClaim;
+    }
+    Ok(withdraw_pool_amount)
 }
 
 pub fn compute_cumulative_share(
@@ -1491,17 +1599,29 @@ pub fn get_spot_vals(
     msg!("spot {:?} :: {:?}", market_index, a);
     let mut b = share_ratio.checked_mul(a).unwrap();
 
-    let mut side;
-    let mut quantity;
-    let mut price;
+    let mut side: serum_dex::matching::Side;
+    let mut quantity: u64;
+    let mut price: u64;
 
-    if a > 0 {
+    if a > I80F48!(0) {
         side = SerumSide::Ask;
-        quantity = I80F48::to_num::<u64>(b).checked_div(market.coin_lot_size).unwrap();
+        quantity = b
+            .checked_floor()
+            .unwrap()
+            .checked_to_num::<u64>()
+            .unwrap()
+            .checked_div(market.coin_lot_size)
+            .unwrap();
         price = 1;
     } else {
         side = SerumSide::Bid;
-        quantity = I80F48::to_num::<u64>(-b).checked_div(market.coin_lot_size).unwrap();
+        quantity = (-b)
+            .checked_floor()
+            .unwrap()
+            .checked_to_num::<u64>()
+            .unwrap()
+            .checked_div(market.coin_lot_size)
+            .unwrap();
         price = u64::MAX;
     }
 
