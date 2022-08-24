@@ -99,7 +99,6 @@ pub struct ForceSettleData {
     pub spot: [bool; MAX_PAIRS],
     pub perps: [bool; MAX_PAIRS],
     pub padding: u8,
-    pub investors_share: I80F48,
     pub penalty: I80F48
 } impl_loadable!(ForceSettleData);
 
