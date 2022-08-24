@@ -100,7 +100,7 @@ pub struct ForceSettleData {
     pub perps: [bool; MAX_PAIRS],
     pub padding: u8,
     pub investors_share: I80F48,
-    pub usdc_before: I80F48
+    pub penalty: I80F48
 } impl_loadable!(ForceSettleData);
 
 
@@ -165,6 +165,8 @@ impl FundData {
         assert_eq!(account.owner, program_id);
 
         let data = Self::load_mut(account)?;
+        assert!(data.is_initialized());
+
         Ok(data)
     }
     pub fn load_checked<'a>(
@@ -175,6 +177,8 @@ impl FundData {
         assert_eq!(account.owner, program_id);
 
         let data = Self::load(account)?;
+        assert!(data.is_initialized());
+        
         Ok(data)
     }
 
@@ -186,7 +190,7 @@ impl FundData {
 }
 
 impl InvestorData {
-    pub fn load_mut_checked<'a>(
+    pub fn load_mut_checked_uninitialized<'a>(
         account: &'a AccountInfo,
         program_id: &Pubkey,
     ) -> Result<RefMut<'a, Self>, ProgramError> {
@@ -194,6 +198,22 @@ impl InvestorData {
         assert_eq!(account.owner, program_id);
 
         let data = Self::load_mut(account)?;
+        assert!(!data.is_initialized());
+
+        Ok(data)
+    }
+    pub fn load_mut_checked<'a>(
+        account: &'a AccountInfo,
+        program_id: &Pubkey,
+        fund_pda: &Pubkey
+    ) -> Result<RefMut<'a, Self>, ProgramError> {
+        assert_eq!(account.data_len(), size_of::<Self>());
+        assert_eq!(account.owner, program_id);
+
+        let data = Self::load_mut(account)?;
+        assert!(data.is_initialized());
+
+        assert_eq!(&data.fund, fund_pda);
         Ok(data)
     }
     pub fn load_checked<'a>(
@@ -204,6 +224,8 @@ impl InvestorData {
         assert_eq!(account.owner, program_id);
 
         let data = Self::load(account)?;
+        assert!(data.is_initialized());
+        
         Ok(data)
     }
 }
