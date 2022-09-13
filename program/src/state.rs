@@ -44,7 +44,7 @@ pub struct FundData {
 
     pub is_initialized: bool,
     pub signer_nonce: u8,
-    pub block_deposits: bool,
+    pub is_public: bool,
     pub paused_for_settlement: bool,
     pub no_of_investments: u32,
     pub no_of_pending_withdrawals: u32,
@@ -83,9 +83,14 @@ pub struct FundData {
     // Delegate for Manager to call place/cancel
     pub delegate: Pubkey,
 
+    // Force settle data
     pub force_settle: ForceSettleData,
 
-    pub padding: [u8; 160]
+    //Manager's lockup
+    pub lockup_amount: I80F48,
+    
+    
+    pub padding: [u8; 144]
 
 
 }

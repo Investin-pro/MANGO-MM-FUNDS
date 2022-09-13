@@ -20,7 +20,14 @@ pub enum FundInstruction {
         amount: u64,
     },
 
-    
+    CreateLockup{
+        amount: u64,
+    },
+
+    ChangeFundPrivacy{
+        status: bool
+    },
+
     InvestorWithdraw,
 
     InvestorRequestWithdraw,
@@ -43,9 +50,11 @@ pub enum FundInstruction {
         open_order_index: u8,
     },
 
+    ReleaseLockup,
+
     ForceWithdraws, 
 
-     ResetMangoDelegate
+    ResetMangoDelegate
     
 }
 
@@ -86,6 +95,23 @@ impl FundInstruction {
             },
             12 => FundInstruction::ForceWithdraws,
             13 => FundInstruction::ResetMangoDelegate,
+            14 => {
+                let amount = array_ref![data, 0, 8];
+                FundInstruction::CreateLockup {
+                    amount: u64::from_le_bytes(*amount),
+                }
+            }
+            15 => {
+                let status = array_ref![data, 0, 1];
+                let status = match status {
+                    [0] => false,
+                    [1] => true,
+                    _ => return None,
+                };
+                FundInstruction::ChangeFundPrivacy { status }
+            }
+
+            16 => FundInstruction::ReleaseLockup,
 
             _ => {
                 return None;
