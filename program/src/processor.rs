@@ -68,7 +68,7 @@ pub const DAY_SECONDS: i64 = 86400;
 pub const HOUR_SECONDS: i64 = 3600;
 pub const ONE_I80F48: I80F48 = I80F48!(1);
 pub const ZERO_I80F48: I80F48 = I80F48!(0);
-pub const DUST_THRESHOLD_USD: I80F48 = I80F48!(50); 
+pub const DUST_THRESHOLD_USD: I80F48 = I80F48!(40); 
 pub const TFF: I80F48 = I80F48!(0.0005); //0.05% bps Taker Fee Factor
 pub const TFCF: I80F48 = I80F48!(0.9995); //0.05% bps Taker Fee Correction Factor
 
@@ -98,12 +98,12 @@ impl Fund {
         ] = accounts;
         
 
-        assert!(manager_ai.is_signer);
+        assert!(manager_ai.is_signer, "Missing Manager signature");
         let (fund_pda, signer_nonce) = Pubkey::find_program_address(&[&manager_ai.key.to_bytes()], program_id);
         assert_eq!(*fund_pda_ai.key, fund_pda);
         let fund_usdc_vault_data = parse_token_account(fund_usdc_vault_ai)?;
         assert!(fund_usdc_vault_data.mint == usdc_token::id() && fund_usdc_vault_data.owner == fund_pda);
-        assert_eq!(*mango_program_ai.key, mango_v3::id());
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
         let account_num: u64 = 0;
         let mango_account_seeds: &[&[u8]] =
             &[&mango_group_ai.key.as_ref(), fund_pda_ai.key.as_ref(), &account_num.to_le_bytes()];
@@ -217,8 +217,8 @@ impl Fund {
         assert!(fund_data.is_public);
         let mut investor_data = InvestorData::load_mut_checked_uninitialized(investor_state_ai, program_id)?;
         assert!(investor_ai.is_signer);
-        assert_eq!(*fund_usdc_vault_ai.key, fund_data.usdc_vault_key);
-        assert_eq!(*token_program_ai.key, spl_token::id());
+        assert_eq!(*fund_usdc_vault_ai.key, fund_data.usdc_vault_key, "Fund $USDC token account mismatch");
+        assert_eq!(*token_program_ai.key, spl_token::id(), "SPL Token Program mismatch");
         assert!(amount >= fund_data.min_amount);
 
      
@@ -278,11 +278,11 @@ impl Fund {
         ] = fixed_ais;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
-        assert_eq!(fund_data.manager_account, *manager_ai.key);
-        assert!(manager_ai.is_signer);
-        assert_eq!(mango_v3::id(), *mango_program_ai.key);
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
-        assert_eq!(*token_program_ai.key, spl_token::id());
+        assert_eq!(*manager_ai.key, fund_data.manager_account, "Manager mismatch");
+        assert!(manager_ai.is_signer, "Missing Manager signature");
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
+        assert_eq!(*token_program_ai.key, spl_token::id(), "SPL Token Program mismatch");
         
         assert!(!fund_data.paused_for_settlement);
         
@@ -309,12 +309,12 @@ impl Fund {
         ];
         drop(fund_data);
 
-        invoke_signed(
+        invoke(
             &mango::instruction::deposit(
                 mango_program_ai.key,
                 mango_group_ai.key,
                 mango_account_ai.key,
-                fund_pda_ai.key,
+                manager_ai.key,
                 mango_cache_ai.key,
                 root_bank_ai.key,
                 node_bank_ai.key,
@@ -326,15 +326,14 @@ impl Fund {
                 mango_program_ai.clone(),
                 mango_group_ai.clone(),
                 mango_account_ai.clone(),
-                fund_pda_ai.clone(),
+                manager_ai.clone(),
                 mango_cache_ai.clone(),
                 root_bank_ai.clone(),
                 node_bank_ai.clone(),
                 vault_ai.clone(),
                 manager_usdc_vault_ai.clone(),
                 token_program_ai.clone(),
-            ],
-            &[&signer_seeds],
+            ]
         )?;
 
         fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
@@ -365,9 +364,9 @@ impl Fund {
             manager_ai,         //Checked on Load
             ] = fixed_ais;
         
-        assert!(manager_ai.is_signer);
+        assert!(manager_ai.is_signer, "Missing Manager signature");
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
-        assert_eq!(*manager_ai.key, fund_data.manager_account);
+        assert_eq!(*manager_ai.key, fund_data.manager_account, "Manager mismatch");
         assert!(fund_data.is_public || fund_data.lockup_amount > DUST_THRESHOLD_USD);
         
         fund_data.is_public = status;
@@ -400,14 +399,14 @@ impl Fund {
         ] = fixed_ais;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
-        assert_eq!(fund_data.manager_account, *manager_ai.key);
-        assert!(manager_ai.is_signer);
+        assert_eq!(*manager_ai.key, fund_data.manager_account, "Manager mismatch");
+        assert!(manager_ai.is_signer, "Missing Manager signature");
         assert_eq!(mango_v3::id(), *mango_program_ai.key);
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
-        assert_eq!(*token_program_ai.key, spl_token::id());
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
+        assert_eq!(*token_program_ai.key, spl_token::id(), "SPL Token Program mismatch");
         
         assert!(!fund_data.paused_for_settlement);
-        assert!(get_lockup_value(&fund_data)? >= DUST_THRESHOLD_USD);
+        assert!(get_lockup_value(&fund_data)? >= DUST_THRESHOLD_USD, "Increase Lockup amount");
         
         update_amount_and_performance(
             &mut fund_data,
@@ -540,11 +539,11 @@ impl Fund {
         ] = fixed_ais;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
-        assert!(manager_ai.is_signer);
-        assert_eq!(*manager_ai.key, fund_data.manager_account);
+        assert!(manager_ai.is_signer, "Missing Manager signature");
+        assert_eq!(*manager_ai.key, fund_data.manager_account, "Manager mismatch");
         assert_eq!(mango_v3::id(), *mango_program_ai.key);
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
-        assert_eq!(*fund_usdc_vault_ai.key, fund_data.usdc_vault_key);
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
+        assert_eq!(*fund_usdc_vault_ai.key, fund_data.usdc_vault_key, "Fund $USDC token account mismatch");
         assert!(!fund_data.paused_for_settlement);
 
         update_amount_and_performance(
@@ -627,8 +626,8 @@ impl Fund {
         ] = accounts;
         
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
-        assert_eq!(*mango_program_ai.key, mango_v3::id());
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
         let ts_check = Clock::get()?.unix_timestamp.checked_rem(WEEK_SECONDS).unwrap();
         assert!((ts_check >= DAY_SECONDS + (10*HOUR_SECONDS)) && (ts_check <= (DAY_SECONDS + (12*HOUR_SECONDS)))); //Only from 10:00 to 12:00 UTC Every Friday
         assert!(fund_data.no_of_pending_withdrawals > 0);
@@ -682,10 +681,10 @@ impl Fund {
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
         
-        assert_eq!(*mango_program_ai.key, mango_v3::id());
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
         
-        assert!(fund_data.paused_for_settlement);
+        assert!(fund_data.paused_for_settlement, "Fund not paused for settlement");
         
         let (mango_active_assets, usdc_val)  = update_amount_and_performance(
             &mut fund_data,
@@ -743,10 +742,10 @@ impl Fund {
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
         
-        assert_eq!(*mango_program_ai.key, mango_v3::id());
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
        
-        assert!(fund_data.force_settle.ready_for_settlement);
+        assert!(fund_data.force_settle.ready_for_settlement, "Fund is not ready for settlement");
         let perp_market_index = get_perp_index(mango_group_ai, mango_program_ai, perp_market_ai)?;
         assert!(fund_data.force_settle.perps[perp_market_index]);
         fund_data.force_settle.perps[perp_market_index] = false;
@@ -864,8 +863,8 @@ impl Fund {
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
         
-        assert_eq!(*mango_program_ai.key, mango_v3::id());
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
         assert!(fund_data.force_settle.ready_for_settlement);
         let spot_market_index = get_spot_index(mango_group_ai, mango_program_ai, spot_market_ai)?;
         assert!(fund_data.force_settle.perps[spot_market_index]);
@@ -1019,10 +1018,10 @@ impl Fund {
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
         
-        assert_eq!(*mango_program_ai.key, mango_v3::id());
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
-        assert_eq!(*fund_usdc_vault_ai.key, fund_data.usdc_vault_key);
-        assert!(fund_data.paused_for_settlement);
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
+        assert_eq!(*fund_usdc_vault_ai.key, fund_data.usdc_vault_key, "Fund $USDC token account mismatch");
+        assert!(fund_data.paused_for_settlement, "Fund not paused for settlement");
         assert_eq!(fund_data.check_force_settled()?, (true, true));
 
         
@@ -1120,7 +1119,7 @@ impl Fund {
         assert_eq!(investor_data.fund, *fund_pda_ai.key);
         assert!(investor_data.investment_status == InvestmentStatus::ReadyToClaim || investor_data.investment_status == InvestmentStatus::PendingDeposit);
 
-        assert_eq!(*token_program_ai.key, spl_token::id());
+        assert_eq!(*token_program_ai.key, spl_token::id(), "SPL Token Program mismatch");
         assert_eq!(fund_data.usdc_vault_key, *fund_vault_ai.key);
 
         let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
@@ -1190,10 +1189,10 @@ impl Fund {
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
         
-        assert!(manager_ai.is_signer);
-        assert_eq!(fund_data.manager_account, *manager_ai.key);
-        assert_eq!(*mango_program_ai.key, mango_v3::id());
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert!(manager_ai.is_signer, "Missing Manager signature");
+        assert_eq!(*manager_ai.key, fund_data.manager_account, "Manager mismatch");
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
 
     
         
@@ -1285,10 +1284,10 @@ impl Fund {
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
-        assert!(manager_ai.is_signer);
-        assert_eq!(fund_data.manager_account, *manager_ai.key);
-        assert_eq!(*mango_program_ai.key, mango_v3::id());
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert!(manager_ai.is_signer, "Missing Manager signature");
+        assert_eq!(*manager_ai.key, fund_data.manager_account, "Manager mismatch");
+        assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
         
         assert!(fund_data.no_of_investments == 0 && fund_data.performance_fee == ZERO_I80F48);
 
@@ -1367,10 +1366,10 @@ impl Fund {
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
-        assert!(manager_ai.is_signer);
+        assert!(manager_ai.is_signer, "Missing Manager signature");
         assert!(!fund_data.paused_for_settlement);
-        assert_eq!(fund_data.manager_account, *manager_ai.key);
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert_eq!(*manager_ai.key, fund_data.manager_account, "Manager mismatch");
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
 
 
         fund_data.delegate = *delegate_ai.key;
@@ -1417,7 +1416,7 @@ impl Fund {
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
         assert!(!fund_data.paused_for_settlement);
-        assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+        assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
         assert_eq!(*delegate_ai.key, fund_data.delegate);
 
         let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
@@ -1551,7 +1550,7 @@ pub fn update_amount_and_performance(
     update_perf: bool,
 ) -> Result<(mango::state::UserActiveAssets, I80F48), ProgramError> {
     
-    assert_eq!(*mango_account_ai.key, fund_data.mango_account);
+    assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
 
     let mango_group = MangoGroup::load_checked(
         mango_group_ai, 
