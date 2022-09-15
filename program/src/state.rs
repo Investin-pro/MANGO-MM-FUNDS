@@ -44,7 +44,7 @@ pub struct FundData {
 
     pub is_initialized: bool,
     pub signer_nonce: u8,
-    pub block_deposits: bool,
+    pub is_public: bool,
     pub paused_for_settlement: bool,
     pub no_of_investments: u32,
     pub no_of_pending_withdrawals: u32,
@@ -83,7 +83,15 @@ pub struct FundData {
     // Delegate for Manager to call place/cancel
     pub delegate: Pubkey,
 
-    pub force_settle: ForceSettleData
+    // Force settle data
+    pub force_settle: ForceSettleData,
+
+    //Manager's lockup
+    pub lockup_amount: I80F48,
+    
+    
+    pub padding: [u8; 144]
+
 
 }
 impl_loadable!(FundData);
@@ -95,6 +103,8 @@ pub struct ForceSettleData {
     pub ready_for_settlement: bool,
     pub spot: [bool; MAX_PAIRS],
     pub perps: [bool; MAX_PAIRS],
+    pub padding: u8,
+    pub penalty: I80F48
 } impl_loadable!(ForceSettleData);
 
 
@@ -159,6 +169,8 @@ impl FundData {
         assert_eq!(account.owner, program_id);
 
         let data = Self::load_mut(account)?;
+        assert!(data.is_initialized());
+
         Ok(data)
     }
     pub fn load_checked<'a>(
@@ -169,6 +181,8 @@ impl FundData {
         assert_eq!(account.owner, program_id);
 
         let data = Self::load(account)?;
+        assert!(data.is_initialized());
+        
         Ok(data)
     }
 
@@ -180,7 +194,7 @@ impl FundData {
 }
 
 impl InvestorData {
-    pub fn load_mut_checked<'a>(
+    pub fn load_mut_checked_uninitialized<'a>(
         account: &'a AccountInfo,
         program_id: &Pubkey,
     ) -> Result<RefMut<'a, Self>, ProgramError> {
@@ -188,6 +202,22 @@ impl InvestorData {
         assert_eq!(account.owner, program_id);
 
         let data = Self::load_mut(account)?;
+        assert!(!data.is_initialized());
+
+        Ok(data)
+    }
+    pub fn load_mut_checked<'a>(
+        account: &'a AccountInfo,
+        program_id: &Pubkey,
+        fund_pda: &Pubkey
+    ) -> Result<RefMut<'a, Self>, ProgramError> {
+        assert_eq!(account.data_len(), size_of::<Self>());
+        assert_eq!(account.owner, program_id);
+
+        let data = Self::load_mut(account)?;
+        assert!(data.is_initialized());
+
+        assert_eq!(&data.fund, fund_pda);
         Ok(data)
     }
     pub fn load_checked<'a>(
@@ -198,6 +228,8 @@ impl InvestorData {
         assert_eq!(account.owner, program_id);
 
         let data = Self::load(account)?;
+        assert!(data.is_initialized());
+        
         Ok(data)
     }
 }
