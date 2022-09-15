@@ -68,7 +68,7 @@ pub const DAY_SECONDS: i64 = 86400;
 pub const HOUR_SECONDS: i64 = 3600;
 pub const ONE_I80F48: I80F48 = I80F48!(1);
 pub const ZERO_I80F48: I80F48 = I80F48!(0);
-pub const DUST_THRESHOLD_USD: I80F48 = I80F48!(40_000_0000);
+pub const DUST_THRESHOLD_USD: I80F48 = I80F48!(40_000_000);
 pub const TFF: I80F48 = I80F48!(0.0005); //0.05% bps Taker Fee Factor
 pub const TFCF: I80F48 = I80F48!(0.9995); //0.05% bps Taker Fee Correction Factor
 
@@ -528,7 +528,7 @@ impl Fund {
             node_bank_ai,           //Checked by Mango Program
             vault_ai,               //Checked by Mango Program
             signer_ai,              //Checked by Mango Program
-            _,
+            _,                                    //Token program
             fund_usdc_vault_ai,     //Checked to match USDC Vault from Fund state
         ] = fixed_ais;
 
