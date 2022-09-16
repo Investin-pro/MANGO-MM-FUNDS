@@ -55,6 +55,10 @@ class U64F64Layout extends Blob {
   }
 }
 
+export function U64F64(property = "") {
+  return new U64F64Layout(property)
+}
+
 export function I80F48(property = "") {
   return new I80F48Layout(property)
 }
@@ -100,7 +104,13 @@ export const FUND_DATA = struct([
     u8('ready_for_settlement'),
     seq(u8('spot'), 15, 'spot'),
     seq(u8('perp'), 15, 'perp'),
+    u8('padding'),
+    I80F48('penalty'),
+
   ]), 1, 'forceSettleData'),
+  I80F48('lockup'),
+  seq(u8('padding'), 144, 'padding'),
+
 
 ])
 
@@ -115,6 +125,88 @@ export const INVESTOR_DATA = struct([
   publicKeyLayout('owner'),
   publicKeyLayout('fund'),
   seq(u8('extra_padding'), 160),
+
+])
+
+export const OLD_INVESTOR_DATA = struct([
+  u8('is_initialized'),
+  u8('has_withdrawn'),
+  u8('withdrawn_from_margin'),
+  seq(u8('padding'), 5),
+
+
+  publicKeyLayout('owner'),
+  u64('amount'),
+  U64F64('start_performance'),
+  u64('amount_in_router'),
+  publicKeyLayout('manager'),
+  seq(U64F64(), 2, 'margin_debt'),
+  seq(u64(), 2, 'margin_position_id'),
+
+  seq(u8(), 8, 'token_indexes'),
+  seq(u64(), 8, 'token_debts'),
+  U64F64('share'),
+  u64('frikuld'),
+  u64('frikfcd'),
+
+
+])
+
+export const OLD_FUND_DATA = struct([
+  u8('is_initialized'),
+  u8('number_of_active_investments'),
+  u8('no_of_investments'),
+  u8('signer_nonce'),
+  u8('no_of_margin_positions'),
+  u8('no_of_assets'),
+  u16('position_count'),
+
+  u8('version'),
+  u8('is_private'),
+  u16('fund_v3_index'),
+  seq(u8(), 4, 'padding'),
+
+  u64('min_amount'),
+  U64F64('min_return'),
+  U64F64('performance_fee_percentage'),
+  U64F64('total_amount'),
+  U64F64('prev_performance'),
+
+  u64('amount_in_router'),
+  U64F64('performance_fee'),
+  publicKeyLayout('manager_account'),
+  publicKeyLayout('fund_pda'),
+  seq(
+    struct([
+      u8('is_active'),
+      seq(u8(),3,'index'),
+      u8('mux'),
+      u8('is_on_mango'),
+      seq(u8(), 2, 'padding'),
+      u64('balance'),
+      u64('debt'),
+      publicKeyLayout('vault')
+    ]),
+    8, 'tokens'
+  ),
+  seq(publicKeyLayout(), 10, 'investors'),
+  
+  struct([
+      publicKeyLayout('mango_account'),
+      seq(u8(),4,'perp_markets'),
+      u8('deposit_index'),
+      u8('markets_active'),
+      u8('deposits_active'),
+      u8('xpadding'),
+      seq(u64(), 2, 'investor_debts'),
+      seq(u8('padding'), 24),
+    ],'mango_positions'),
+
+  // mangoInfoLayout('mango_positions'),
+  
+     
+  seq(u8(), 80, 'margin_update_padding'),
+  seq(u8(), 32, 'padding'),
 
 ])
 

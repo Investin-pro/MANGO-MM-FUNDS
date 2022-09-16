@@ -168,7 +168,7 @@ export const ForceUpdatePerp = () => {
 
   return (
     <div className="form-div">
-      <h4>Init Force Settle</h4>
+      <h4>Force Update Perp</h4>
 
       Fund  ::: {' '}
         <input type="text" value={fundAddress} onChange={(event) => setFundAddress(event.target.value)} />
