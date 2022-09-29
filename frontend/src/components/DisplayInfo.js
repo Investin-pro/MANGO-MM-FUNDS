@@ -40,7 +40,6 @@ const handleGetFundData = async () => {
     alert("connect wallet ")
     return;
   }
-
   const fundPDA = (await PublicKey.findProgramAddress([walletProvider?.publicKey.toBuffer()], programId))[0];
   console.log("fundPDA::",fundPDA.toBase58())
   setFundAddress(fundPDA.toBase58())
@@ -205,6 +204,8 @@ const getMangoAccountData = async () => {
             <p> usdc_vault_key  : {fundData.usdc_vault_key.toBase58()}</p>
             <p> mango_account  : {fundData.mango_account.toBase58()}</p>
             <p> delegate  : {fundData.delegate.toBase58()}</p>
+            <p> Lockup  : {fundData.lockup.toString()}</p>
+
             <br/>
            
           </>

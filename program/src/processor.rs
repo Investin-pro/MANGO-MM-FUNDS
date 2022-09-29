@@ -63,6 +63,12 @@ pub mod mango_v3 {
 }
 
 
+pub mod mango_v3 {
+    use solana_program::declare_id;
+    declare_id!("mv3ekLzLbnVPNxjSKvqBpU3ZeZXPQdEC3bp5MDEBG68");
+}
+
+
 pub const WEEK_SECONDS: i64 = 604800;
 pub const DAY_SECONDS: i64 = 86400;
 pub const HOUR_SECONDS: i64 = 3600;
@@ -1738,7 +1744,7 @@ pub fn compute_withdraw_amount(
     let mut withdraw_amount:u64 = 0;
     for i in 0..investors_ais.len() {
         let mut investor_data = InvestorData::load_mut_checked(&investors_ais[i], program_id, fund_pda_ai.key)?;
-        assert!(investor_data.investment_status == InvestmentStatus::PendingWithdraw);
+        assert!(investor_data.investment_status == InvestmentStatus::PendingWithdraw || investor_data.investment_status == InvestmentStatus::Active);
         let performance:I80F48 = fund_data.current_index.checked_div(investor_data.start_index).unwrap();
         let returns = I80F48::from_num(investor_data.amount)
             .checked_mul(performance)
@@ -1751,7 +1757,9 @@ pub fn compute_withdraw_amount(
         investor_data.returns = compute_returns(&mut investor_data, fund_data, returns)?;
 
         withdraw_amount = withdraw_amount.checked_add(investor_data.returns).unwrap();
-        fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_sub(1).unwrap();
+        if investor_data.investment_status == InvestmentStatus::PendingWithdraw {
+            fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_sub(1).unwrap();
+        }
         fund_data.no_of_investments = fund_data.no_of_investments.checked_sub(1).unwrap();
         investor_data.investment_status = InvestmentStatus::ReadyToClaim;
     }

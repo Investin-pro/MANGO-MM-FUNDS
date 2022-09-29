@@ -87,7 +87,7 @@ export const ForceUpdatePerp = () => {
       { pubkey: new PublicKey(ids.spotMarkets[perpIndex].publicKey), isSigner: false, isWritable: true }, //root_bank_ai
       { pubkey: new PublicKey(ids.spotMarkets[perpIndex].bidsKey), isSigner: false, isWritable: true }, //node_bank_ai
       { pubkey: new PublicKey(ids.spotMarkets[perpIndex].asksKey), isSigner: false, isWritable: true }, //node_bank_ai
-      { pubkey: new PublicKey(ids.spotMarkets[perpIndex].), isSigner: false, isWritable: true }, //node_bank_ai
+      // { pubkey: new PublicKey(ids.spotMarkets[perpIndex].), isSigner: false, isWritable: true }, //node_bank_ai
       { pubkey: new PublicKey(ids.spotMarkets[perpIndex].eventsKey), isSigner: false, isWritable: true }, //node_bank_ai
       { pubkey: fundState.mango_account, isSigner: false, isWritable: true },
       ...spotOrdersKeys,
