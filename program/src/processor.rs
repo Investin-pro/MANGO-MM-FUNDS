@@ -63,6 +63,12 @@ pub mod mango_v3 {
 }
 
 
+pub mod mango_v3 {
+    use solana_program::declare_id;
+    declare_id!("mv3ekLzLbnVPNxjSKvqBpU3ZeZXPQdEC3bp5MDEBG68");
+}
+
+
 pub const WEEK_SECONDS: i64 = 604800;
 pub const DAY_SECONDS: i64 = 86400;
 pub const HOUR_SECONDS: i64 = 3600;

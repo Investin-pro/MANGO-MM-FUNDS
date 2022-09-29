@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "program"
+]
+
+[features]
+seeds = false
+skip-lint = false
+
+[programs.mainnet]
+investin = "HDFNSB26prLvBB2vvAoUoDEbQYbUxdUJztRcjozNakfz"
+
+[provider]
+cluster = "mainnet"
+wallet = "~/.config/solana/id.json"
+

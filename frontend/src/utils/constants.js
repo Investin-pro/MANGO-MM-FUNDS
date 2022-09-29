@@ -12,8 +12,8 @@ export const adminAccount = new PublicKey('Fepyuf4vy7mKZVgpzS52UoUeSLmVvGnoMDyra
 // export const cluster = "https://api.devnet.solana.com";
 // export const cluster = "https://solana-pi.projectserum.com";
 // export const cluster = "https://ssc-dao.genesysgo.net/";
-// export const cluster = "https://mainnet-beta.solflare.network";
-export const cluster = "https://mango.rpcpool.com";
+export const cluster = "https://mainnet-beta.solflare.network";
+// export const cluster = "https://mango.rpcpool.com";
 
 export const connection = new Connection(cluster, "recent");
 
