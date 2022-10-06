@@ -40,7 +40,7 @@ pub enum FundInstruction {
 
     SetMangoDelegate,
 
-    PauseForSettlement,
+    PauseForEnforcement,
 
     InitForceSettle,
 
@@ -84,7 +84,7 @@ impl FundInstruction {
             5 => FundInstruction::ProcessWithdraws,
             6 => FundInstruction::ClaimPerformanceFee,
             7 => FundInstruction::SetMangoDelegate,
-            8 => FundInstruction::PauseForSettlement,
+            8 => FundInstruction::PauseForEnforcement,
             9 => FundInstruction::InitForceSettle,
             10 => FundInstruction::ForceUpdatePerp,
             11 => {
