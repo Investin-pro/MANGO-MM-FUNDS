@@ -63,12 +63,6 @@ pub mod mango_v3 {
 }
 
 
-pub mod mango_v3 {
-    use solana_program::declare_id;
-    declare_id!("mv3ekLzLbnVPNxjSKvqBpU3ZeZXPQdEC3bp5MDEBG68");
-}
-
-
 pub const WEEK_SECONDS: i64 = 604800;
 pub const DAY_SECONDS: i64 = 86400;
 pub const HOUR_SECONDS: i64 = 3600;
@@ -383,7 +377,7 @@ impl Fund {
         const NUM_FIXED: usize = 11;
         let (fixed_ais, open_orders_ais, investors_ais) = array_refs![accounts, NUM_FIXED, MAX_PAIRS; ..;];
 
-        msg!("ivnestors ais:: {:?}", investors_ais.len());
+        // msg!("ivnestors ais:: {:?}", investors_ais.len());
         let [
             fund_pda_ai,            //Checked on load and to match manager account
             manager_ai,             //Checked for signer
@@ -685,6 +679,8 @@ impl Fund {
         assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
 
         assert!(fund_data.paused_for_settlement, "Fund not paused for settlement");
+        assert!(!fund_data.force_settle.ready_for_settlement , "Fund ready for settlement");
+
 
         let (mango_active_assets, usdc_val)  = update_amount_and_performance(
             &mut fund_data,
@@ -834,7 +830,7 @@ impl Fund {
         open_orders_index: u8,
     ) -> Result<(), ProgramError> {
 
-        const NUM_FIXED: usize = 21;
+        const NUM_FIXED: usize = 23;
         let (fixed_ais, packed_open_orders_ais) = array_refs![accounts, NUM_FIXED; ..;];
 
         let [
@@ -855,20 +851,23 @@ impl Fund {
             base_node_bank_ai,      // Checked by Mango Program
             base_vault_ai,          // Checked by Mango Program
             quote_root_bank_ai,     // Checked by Mango Program
+            quote_node_bank_ai,     // Checked by Mango Program
             quote_vault_ai,         // Checked by Mango Program
             signer_ai,              // Checked by Mango Program
             dex_signer_ai,          // Checked by Mango Program
             msrm_or_srm_vault_ai,   // Checked by Mango Program
+            token_program_ai,
         ] = fixed_ais;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
         assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
         assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
+        assert_eq!(*token_program_ai.key, spl_token::id(), "SPL Token Program mismatch");
         assert!(fund_data.force_settle.ready_for_settlement);
         let spot_market_index = get_spot_index(mango_group_ai, mango_program_ai, spot_market_ai)?;
-        assert!(fund_data.force_settle.perps[spot_market_index]);
-        fund_data.force_settle.perps[spot_market_index] = false;
+        assert!(fund_data.force_settle.spot[spot_market_index]);
+        fund_data.force_settle.spot[spot_market_index] = false;
         let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
         let mut packed_open_orders = vec![];
         for i in 0..packed_open_orders_ais.len(){
@@ -879,117 +878,121 @@ impl Fund {
             spot_market_index,
             mango_account_ai,
             mango_group_ai,
-            mango_cache_ai,
             mango_program_ai,
+            mango_cache_ai,
             spot_market_ai,
             dex_prog_ai,
         )?;
         msg!("Side: {:?}, Price {:?}, Quanitiy {:?}", side, price, coin_lots);
-        let order = NewOrderInstructionV3 {
-            side: side,
-            limit_price: NonZeroU64::new(price).unwrap(),
-            max_coin_qty: NonZeroU64::new(coin_lots).unwrap(),
-            max_native_pc_qty_including_fees: NonZeroU64::new(u64::MAX).unwrap(),
-            self_trade_behavior: SelfTradeBehavior::AbortTransaction,
-            order_type: serum_dex::matching::OrderType::ImmediateOrCancel,
-            client_order_id: 1,
-            limit: 65535,
-            max_ts: 0,
-        };
         let signer_seeds = [
             &manager_account.as_ref(),
             bytes_of(&signer_nonce),
         ];
         drop(fund_data);
+        
+        if coin_lots > 0 {
+            let order = NewOrderInstructionV3 {
+                side: side,
+                limit_price: NonZeroU64::new(price).unwrap(),
+                max_coin_qty: NonZeroU64::new(coin_lots).unwrap(),
+                max_native_pc_qty_including_fees: NonZeroU64::new(u64::MAX).unwrap(),
+                self_trade_behavior: SelfTradeBehavior::AbortTransaction,
+                order_type: serum_dex::matching::OrderType::ImmediateOrCancel,
+                client_order_id: 1,
+                limit: 65535,
+                max_ts: i64::MAX,
+            };
+            
 
 
 
-        invoke_signed(
-            &mango::instruction::cancel_all_spot_orders(
+            invoke_signed(
+                &mango::instruction::cancel_all_spot_orders(
+                    mango_program_ai.key,
+                    mango_group_ai.key,
+                    mango_cache_ai.key,
+                    mango_account_ai.key,
+                    fund_pda_ai.key,
+                    base_root_bank_ai.key,
+                    base_node_bank_ai.key,
+                    base_vault_ai.key,
+                    quote_root_bank_ai.key,
+                    quote_node_bank_ai.key,
+                    quote_vault_ai.key,
+                    spot_market_ai.key,
+                    bids_ai.key,
+                    asks_ai.key,
+                    &packed_open_orders[open_orders_index as usize],
+                    signer_ai.key,
+                    dex_event_queue_ai.key,
+                    dex_base_ai.key,
+                    dex_quote_ai.key,
+                    dex_signer_ai.key,
+                    dex_prog_ai.key,
+                    u8::MAX,
+                )?,
+                accounts.clone(),
+                &[&signer_seeds],
+            )?;
+
+
+
+            let val_before = get_mango_net(
+                mango_account_ai,
+                mango_group_ai,
+                mango_cache_ai,
+                mango_program_ai,
+                packed_open_orders_ais
+            )?;
+
+
+            invoke_signed(&mango::instruction::place_spot_order2(
                 mango_program_ai.key,
                 mango_group_ai.key,
-                mango_cache_ai.key,
                 mango_account_ai.key,
                 fund_pda_ai.key,
+                mango_cache_ai.key,
+                dex_prog_ai.key,
+                spot_market_ai.key,
+                bids_ai.key,
+                asks_ai.key,
+                dex_request_queue_ai.key,
+                dex_event_queue_ai.key,
+                dex_base_ai.key,
+                dex_quote_ai.key,
                 base_root_bank_ai.key,
                 base_node_bank_ai.key,
                 base_vault_ai.key,
                 quote_root_bank_ai.key,
+                quote_node_bank_ai.key,
                 quote_vault_ai.key,
-                quote_vault_ai.key,
-                spot_market_ai.key,
-                bids_ai.key,
-                asks_ai.key,
-                &packed_open_orders[open_orders_index as usize],
                 signer_ai.key,
-                dex_event_queue_ai.key,
-                dex_base_ai.key,
-                dex_quote_ai.key,
                 dex_signer_ai.key,
-                dex_prog_ai.key,
-                u8::MAX,
+                msrm_or_srm_vault_ai.key,
+                &packed_open_orders,
+                open_orders_index as usize,
+                order,
             )?,
             accounts.clone(),
             &[&signer_seeds],
-        )?;
+            )?;
 
+            let val_after = get_mango_net(
+                mango_account_ai,
+                mango_group_ai,
+                mango_cache_ai,
+                mango_program_ai,
+                packed_open_orders_ais
+            )?;
 
+            let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
-        let val_before = get_mango_net(
-            mango_account_ai,
-            mango_group_ai,
-            mango_cache_ai,
-            mango_program_ai,
-            packed_open_orders_ais
-        )?;
-
-
-        invoke_signed(&mango::instruction::place_spot_order2(
-            mango_program_ai.key,
-            mango_group_ai.key,
-            mango_account_ai.key,
-            fund_pda_ai.key,
-            mango_cache_ai.key,
-            dex_prog_ai.key,
-            spot_market_ai.key,
-            bids_ai.key,
-            asks_ai.key,
-            dex_request_queue_ai.key,
-            dex_event_queue_ai.key,
-            dex_base_ai.key,
-            dex_quote_ai.key,
-            base_root_bank_ai.key,
-            base_node_bank_ai.key,
-            base_vault_ai.key,
-            quote_root_bank_ai.key,
-            quote_vault_ai.key,
-            quote_vault_ai.key,
-            signer_ai.key,
-            dex_signer_ai.key,
-            msrm_or_srm_vault_ai.key,
-            &packed_open_orders,
-            open_orders_index as usize,
-            order,
-        )?,
-        accounts.clone(),
-        &[&signer_seeds],
-        )?;
-
-        let val_after = get_mango_net(
-            mango_account_ai,
-            mango_group_ai,
-            mango_cache_ai,
-            mango_program_ai,
-            packed_open_orders_ais
-        )?;
-
-        let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
-
-        fund_data.force_settle.penalty = fund_data.force_settle.penalty
-            .checked_add(val_before)
-            .unwrap()
-            .checked_sub(val_after)
-            .unwrap();
+            fund_data.force_settle.penalty = fund_data.force_settle.penalty
+                .checked_add(val_before)
+                .unwrap()
+                .checked_sub(val_after)
+                .unwrap();
+        }
         Ok(())
     }
 
@@ -998,7 +1001,7 @@ impl Fund {
         accounts: &[AccountInfo],
     ) -> Result<(), ProgramError> {
 
-        const NUM_FIXED: usize = 10;
+        const NUM_FIXED: usize = 11;
         let fixed_ais = array_ref![accounts, 0, NUM_FIXED];
         let open_orders_ais = array_ref![accounts, NUM_FIXED, MAX_PAIRS];
         let investors_ais = &accounts[NUM_FIXED+MAX_PAIRS..];
@@ -1013,6 +1016,7 @@ impl Fund {
             vault_ai,               //Checked by Mango Program
             signer_ai,              //Checked by Mango Program
             fund_usdc_vault_ai,     //Checked to match USDC Vault from Fund state
+            _,                                    //Token Program ID
         ] = fixed_ais;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
@@ -1023,7 +1027,6 @@ impl Fund {
         assert_eq!(*fund_usdc_vault_ai.key, fund_data.usdc_vault_key, "Fund $USDC token account mismatch");
         assert!(fund_data.paused_for_settlement, "Fund not paused for settlement");
         assert_eq!(fund_data.check_force_settled()?, (true, true));
-
 
         update_amount_and_performance(
             &mut fund_data,
@@ -1955,7 +1958,9 @@ pub fn get_spot_vals(
         price = u64::MAX;
     }
 
-    if b == a {
+    if !mango_account.in_margin_basket[market_index]{
+        Ok((SerumSide::Ask, 0, 0))
+    } else if b == a {
         Ok((side, price, quantity))
     } else {
         Ok((side, price, quantity + 1))
