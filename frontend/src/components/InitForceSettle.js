@@ -57,13 +57,17 @@ export const InitForceSettle = () => {
       filters: [
         {
           memcmp : { offset : INVESTOR_DATA.offsetOf('fund') , bytes : fundPDA.toString()},
-          memcmp : { offset : INVESTOR_DATA.offsetOf('investment_status') , bytes : bs58.encode((new BN(3, 'le')).toArray())}
+          // memcmp : { offset : INVESTOR_DATA.offsetOf('investment_status') , bytes : bs58.encode((new BN(3, 'le')).toArray())}
         },
         { dataSize: INVESTOR_DATA.span }
       ]
      });
 
-     const investmentKeys = investments.map( (i,index) => { 
+     
+
+     const investments2 = investments.map(i => {return {data: INVESTOR_DATA.decode(i.account.data), pubkey: i.pubkey}})
+
+     const investmentKeys = investments2.filter(k => k.data.investment_status == 3 && k.data.fund.toBase58() == fundAddress).map( (i,index) => { 
       return {
         pubkey : i.pubkey,
         isSigner : false,

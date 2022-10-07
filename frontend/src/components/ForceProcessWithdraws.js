@@ -64,23 +64,29 @@ export const ForceProcessWithdraws = () => {
       }
     })
 
+    
     let investments = await connection.getProgramAccounts(programId, { 
       filters: [
         {
           memcmp : { offset : INVESTOR_DATA.offsetOf('fund') , bytes : fundPDA.toString()},
-          memcmp : { offset : INVESTOR_DATA.offsetOf('investment_status') , bytes : bs58.encode((new BN(4, 'le')).toArray())}
+          // memcmp : { offset : INVESTOR_DATA.offsetOf('investment_status') , bytes : bs58.encode((new BN(3, 'le')).toArray())}
         },
         { dataSize: INVESTOR_DATA.span }
       ]
      });
 
-     const investmentKeys = investments.map( (i,index) => { 
+     
+
+     const investments2 = investments.map(i => {return {data: INVESTOR_DATA.decode(i.account.data), pubkey: i.pubkey}})
+
+     const investmentKeys = investments2.filter(k => k.data.investment_status == 4 && k.data.fund.toBase58() == fundAddress).map( (i,index) => { 
       return {
         pubkey : i.pubkey,
         isSigner : false,
         isWritable : true
       }
     })
+
 
     const dataLayout = struct([u32('instruction')])
     const data = Buffer.alloc(dataLayout.span)
@@ -100,8 +106,8 @@ export const ForceProcessWithdraws = () => {
       { pubkey: new PublicKey('BGcwkj1WudQwUUjFk78hAjwd1uAm8trh1N4CJSa51euh'), isSigner: false, isWritable: true }, //node_bank_ai
       { pubkey: nodeBank.vault, isSigner: false, isWritable: true }, //vault_ai
       { pubkey: mangoGroup.signerKey, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: fundState.usdc_vault_key, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       ...spotOrdersKeys,
       ...investmentKeys,
     ];
