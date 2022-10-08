@@ -1117,11 +1117,12 @@ impl Fund {
         accounts: &[AccountInfo],
     ) -> Result<(), ProgramError> {
 
-        const NUM_FIXED: usize = 10;
+        const NUM_FIXED: usize = 11;
         let fixed_ais = array_ref![accounts, 0, NUM_FIXED];
         let open_orders_ais = array_ref![accounts, NUM_FIXED, MAX_PAIRS];
         let investors_ais = &accounts[NUM_FIXED+MAX_PAIRS..];
         let [
+            platform_ai,
             fund_pda_ai,            //Checked on load
             mango_program_ai,       //Checked to match Mango Program ID
             mango_group_ai,         //Checked by Mango Program
@@ -1133,6 +1134,7 @@ impl Fund {
             signer_ai,              //Checked by Mango Program
             fund_usdc_vault_ai,     //Checked to match USDC Vault from Fund state
         ] = fixed_ais;
+        let platform_data = PlatformData::load_checked(platform_ai, program_id)?;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
@@ -1286,13 +1288,14 @@ impl Fund {
         accounts: &[AccountInfo],
     ) -> Result<(), ProgramError> {
 
-        const NUM_FIXED: usize = 12;
+        const NUM_FIXED: usize = 13;
 
         let accounts = array_ref![accounts, 0, NUM_FIXED + MAX_PAIRS];
 
         let (fixed_ais, open_orders_ais) = array_refs![accounts, NUM_FIXED, MAX_PAIRS];
 
         let [
+            platform_ai,
             fund_pda_ai,
             manager_ai,                 //Checked to match Manger Account from Fund State
             mango_program_ai,           //Checked to match Mango Program ID
@@ -1306,6 +1309,8 @@ impl Fund {
             _,                                        //Token Program for CPI to Mango
             manager_usdc_vault_ai,
         ] = fixed_ais;
+
+        let platform_data = PlatformData::load_checked(platform_ai, program_id)?;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
@@ -1385,13 +1390,14 @@ impl Fund {
         accounts: &[AccountInfo],
     ) -> Result<(), ProgramError> {
 
-        const NUM_FIXED: usize = 12;
+        const NUM_FIXED: usize = 13;
 
         let accounts = array_ref![accounts, 0, NUM_FIXED + MAX_PAIRS];
 
         let (fixed_ais, open_orders_ais) = array_refs![accounts, NUM_FIXED, MAX_PAIRS];
 
         let [
+            platform_ai,
             fund_pda_ai,
             manager_ai,                 //Checked to match Manger Account from Fund State
             mango_program_ai,           //Checked to match Mango Program ID
@@ -1405,6 +1411,7 @@ impl Fund {
             manager_token_vault_ai,     //No check required
             _                                         //Token Program
         ] = fixed_ais;
+        let platform_data = PlatformData::load_checked(platform_ai, program_id)?;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
