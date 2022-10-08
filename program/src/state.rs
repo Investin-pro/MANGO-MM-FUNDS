@@ -54,7 +54,7 @@ pub struct FundData {
     pub min_amount: u64,
 
     /// Performance Fee Percentage
-    pub performance_fee_percentage: I80F48,
+    pub performance_fee_ratio: I80F48,
 
     /// Fund AUM
     pub total_amount: I80F48,
@@ -116,9 +116,11 @@ pub struct PlatformData {
     pub admin: Pubkey,
     pub default_referrer: Pubkey,
     pub platform_usdc_vault: Pubkey,
-    pub platform_fee: I80F48,
-    pub management_fee: I80F48,
-    pub referral_fee: I80F48,
+    pub min_amount_limit: u64,
+    pub performance_fee_ratio_limit: I80F48,
+    pub platform_fee_ratio: I80F48,
+    pub management_fee_ratio: I80F48,
+    pub referral_fee_ratio: I80F48,
     pub dust_threshold: I80F48,
     pub taker_fee_cf: I80F48, //5 bps Taker Fee Correction Factor 
     pub withdrawal_recess_sts: i64,

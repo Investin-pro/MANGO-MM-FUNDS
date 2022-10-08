@@ -277,7 +277,7 @@ impl MangoProgramTest {
         quote_mint.index = quote_index;
         mints[quote_index] = quote_mint;
 
-        let mut test = ProgramTest::new("mm", investin_program_id, processor!(process_instruction));
+        let mut test = ProgramTest::new("investin", investin_program_id, processor!(process_instruction));
         test.add_program("mango", mango_program_id, processor!(process_mango_instruction));
         test.add_program("serum_dex", serum_program_id, processor!(process_serum_instruction));
         // TODO: add more programs (oracles)

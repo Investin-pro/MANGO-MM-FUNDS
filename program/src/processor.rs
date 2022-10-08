@@ -91,10 +91,10 @@ impl Fund {
         const NUM_FIXED: usize = 4;
         let accounts = array_ref![accounts, 0, NUM_FIXED];
         let [
-            platform_pda_ai,
-            admin_ai,
+            platform_pda_ai,            //Checked to match Seeds
+            admin_ai,                   //Checked for Signer
             platform_usdc_vault_ai,     //Checked for Token Account Mint to match USDC Token Mint and Owner to match fund_pda
-            system_program_ai       //Checked
+            system_program_ai           //Checked
         ] = accounts;
 
         assert!(admin_ai.is_signer, "Missing Admin Signature");
@@ -135,9 +135,9 @@ impl Fund {
     pub fn admin_control(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
-        platform_fee: I80F48,
-        management_fee: I80F48,
-        referral_fee: I80F48,
+        platform_fee_ratio: I80F48,
+        management_fee_ratio: I80F48,
+        referral_fee_ratio: I80F48,
         dust_threshold: I80F48,
         taker_fee_cf: I80F48, //5 bps Taker Fee Correction Factor 
         withdrawal_recess_sts: i64,
@@ -158,12 +158,12 @@ impl Fund {
         let mut platform_data = PlatformData::load_mut_checked(platform_pda_ai, program_id)?;
         
         assert!(admin_ai.is_signer, "Missing Admin signature");
-        assert_eq!(*admin_ai.key, platform_data.admin, "Admin mismatch")
+        assert_eq!(*admin_ai.key, platform_data.admin, "Admin mismatch");
         let new_platform_usdc_vault_data = parse_token_account(new_platform_usdc_vault_ai)?;
         assert!(new_platform_usdc_vault_data.mint == usdc_token::id() && new_platform_usdc_vault_data.owner == *platform_pda_ai.key, "Invalid $USDC token account");
-        assert!(platform_fee < ONE_PC, "Invalid Param");
-        assert!(management_fee < ONE_PC, "Invalid Param");
-        assert!(referral_fee < ONE_PC, "Invalid Param");
+        assert!(platform_fee_ratio < ONE_PC, "Invalid Param");
+        assert!(management_fee_ratio < ONE_PC, "Invalid Param");
+        assert!(referral_fee_ratio < ONE_PC, "Invalid Param");
         assert!(taker_fee_cf > TFCF, "Invalid Param");
         let enforcement_delay = enforcement_period_sts.checked_sub(withdrawal_recess_sts).unwrap();
         let enforcement_period = withdrawal_recess_ets.checked_sub(enforcement_period_sts).unwrap();
@@ -171,9 +171,9 @@ impl Fund {
         assert!(enforcement_period > 7200, "Enforcement Period Less than 2 Hours");
 
 
-        platform_data.platform_fee = platform_fee;
-        platform_data.management_fee = management_fee;
-        platform_data.referral_fee = referral_fee;
+        platform_data.platform_fee_ratio = platform_fee_ratio;
+        platform_data.management_fee_ratio = management_fee_ratio;
+        platform_data.referral_fee_ratio = referral_fee_ratio;
         platform_data.dust_threshold = dust_threshold;
         platform_data.taker_fee_cf = taker_fee_cf;
         platform_data.withdrawal_recess_sts = withdrawal_recess_sts;
@@ -189,12 +189,13 @@ impl Fund {
         program_id: &Pubkey,
         accounts: &[AccountInfo],
         min_amount: u64,
-        performance_fee_bps: u64,
+        performance_fee_ratio: I80F48,
     ) -> Result<(), ProgramError> {
-        const NUM_FIXED: usize = 8;
+        const NUM_FIXED: usize = 9;
         let accounts = array_ref![accounts, 0, NUM_FIXED];
 
         let [
+            platform_ai,
             manager_ai,             //Checked for Signer
             fund_pda_ai,            //Checked to match the generated PDA using manager_ai Pubkey as seed
             fund_usdc_vault_ai,     //Checked for Token Account Mint to match USDC Token Mint and Owner to match fund_pda
@@ -204,7 +205,8 @@ impl Fund {
             delegate_ai,            //No Check Required
             system_program_ai       //Checked
         ] = accounts;
-
+        
+        let platform_data = PlatformData::load_checked(platform_ai, program_id)?;
 
         assert!(manager_ai.is_signer, "Missing Manager signature");
         let (fund_pda, signer_nonce) = Pubkey::find_program_address(&[&manager_ai.key.to_bytes()], program_id);
@@ -219,8 +221,8 @@ impl Fund {
         assert_eq!(*mango_account_ai.key, mango_account_pk, "Mango Account mismatch");
         assert_eq!(*system_program_ai.key, solana_program::system_program::id(), "System Program ID mismatch");
 
-        assert!(min_amount >= 10000000);
-        assert!(performance_fee_bps >= 100 && performance_fee_bps <= 8000);
+        assert!(min_amount >= platform_data.min_amount_limit);
+        assert!(performance_fee_ratio >= ZERO_I80F48 && performance_fee_ratio <= platform_data.performance_fee_ratio_limit);
 
 
         // check if pda matches
@@ -293,7 +295,7 @@ impl Fund {
         fund_data.signer_nonce = signer_nonce;
         fund_data.is_public = false;
         fund_data.min_amount = min_amount;
-        fund_data.performance_fee_percentage = I80F48::from_num(performance_fee_bps).checked_div(I80F48!(100)).unwrap();
+        fund_data.performance_fee_ratio = performance_fee_ratio;
         fund_data.current_index = ONE_I80F48;
         fund_data.manager_account = *manager_ai.key;
         fund_data.usdc_vault_key = *fund_usdc_vault_ai.key;
@@ -462,18 +464,20 @@ impl Fund {
         accounts: &[AccountInfo],
         status: bool,
     ) -> Result<(), ProgramError> {
-        const NUM_FIXED: usize = 2;
+        const NUM_FIXED: usize = 3;
         let fixed_ais = array_ref![accounts, 0, NUM_FIXED];
 
         let [
+            platform_ai,        //Checked don load
             fund_pda_ai,        //Checked on load
             manager_ai,         //Checked on Load
             ] = fixed_ais;
 
+        let platform_data = PlatformData::load_checked(platform_ai, program_id)?;
         assert!(manager_ai.is_signer, "Missing Manager signature");
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
         assert_eq!(*manager_ai.key, fund_data.manager_account, "Manager mismatch");
-        assert!(fund_data.is_public || get_lockup_value(&fund_data)? > DUST_THRESHOLD_USD);
+        assert!(fund_data.is_public || get_lockup_value(&fund_data)? > platform_data.dust_threshold);
 
         fund_data.is_public = status;
 
@@ -489,7 +493,7 @@ impl Fund {
         const NUM_FIXED: usize = 12;
         let (fixed_ais, open_orders_ais, investors_ais) = array_refs![accounts, NUM_FIXED, MAX_PAIRS; ..;];
 
-        msg!("ivnestors ais:: {:?}", investors_ais.len());
+        // msg!("ivnestors ais:: {:?}", investors_ais.len());
         let [
             platform_ai,
             fund_pda_ai,            //Checked on load and to match manager account
@@ -574,7 +578,6 @@ impl Fund {
             &[&signer_seeds],
         )?;
 
-        let platform_data = PlatformData::load_checked(platform_ai, program_id)?;
         fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
         fund_data.pending_deposits = fund_data.pending_deposits.checked_sub(deposit_amount).unwrap();
@@ -803,6 +806,7 @@ impl Fund {
         assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
 
         assert!(fund_data.paused_for_enforcement, "Fund not paused for settlement");
+        assert!(!fund_data.force_settle.ready_for_settlement , "Fund ready for settlement");
 
         let (mango_active_assets, usdc_val)  = update_amount_and_performance(
             &platform_data,
@@ -953,7 +957,7 @@ impl Fund {
         open_orders_index: u8,
     ) -> Result<(), ProgramError> {
 
-        const NUM_FIXED: usize = 21;
+        const NUM_FIXED: usize = 23;
         let (fixed_ais, packed_open_orders_ais) = array_refs![accounts, NUM_FIXED; ..;];
 
         let [
@@ -974,20 +978,23 @@ impl Fund {
             base_node_bank_ai,      // Checked by Mango Program
             base_vault_ai,          // Checked by Mango Program
             quote_root_bank_ai,     // Checked by Mango Program
+            quote_node_bank_ai,     // Checked by Mango Program
             quote_vault_ai,         // Checked by Mango Program
             signer_ai,              // Checked by Mango Program
             dex_signer_ai,          // Checked by Mango Program
             msrm_or_srm_vault_ai,   // Checked by Mango Program
+            token_program_ai,
         ] = fixed_ais;
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
         assert_eq!(*mango_program_ai.key, mango_v3::id(), "Mango Program mismatch");
         assert_eq!(*mango_account_ai.key, fund_data.mango_account, "Mango Account mismatch");
+        assert_eq!(*token_program_ai.key, spl_token::id(), "SPL Token Program mismatch");
         assert!(fund_data.force_settle.ready_for_settlement);
         let spot_market_index = get_spot_index(mango_group_ai, mango_program_ai, spot_market_ai)?;
-        assert!(fund_data.force_settle.perps[spot_market_index]);
-        fund_data.force_settle.perps[spot_market_index] = false;
+        assert!(fund_data.force_settle.spot[spot_market_index]);
+        fund_data.force_settle.spot[spot_market_index] = false;
         let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
         let mut packed_open_orders = vec![];
         for i in 0..packed_open_orders_ais.len(){
@@ -998,117 +1005,121 @@ impl Fund {
             spot_market_index,
             mango_account_ai,
             mango_group_ai,
-            mango_cache_ai,
             mango_program_ai,
+            mango_cache_ai,
             spot_market_ai,
             dex_prog_ai,
         )?;
         msg!("Side: {:?}, Price {:?}, Quanitiy {:?}", side, price, coin_lots);
-        let order = NewOrderInstructionV3 {
-            side: side,
-            limit_price: NonZeroU64::new(price).unwrap(),
-            max_coin_qty: NonZeroU64::new(coin_lots).unwrap(),
-            max_native_pc_qty_including_fees: NonZeroU64::new(u64::MAX).unwrap(),
-            self_trade_behavior: SelfTradeBehavior::AbortTransaction,
-            order_type: serum_dex::matching::OrderType::ImmediateOrCancel,
-            client_order_id: 1,
-            limit: 65535,
-            max_ts: 0,
-        };
         let signer_seeds = [
             &manager_account.as_ref(),
             bytes_of(&signer_nonce),
         ];
         drop(fund_data);
+        
+        if coin_lots > 0 {
+            let order = NewOrderInstructionV3 {
+                side: side,
+                limit_price: NonZeroU64::new(price).unwrap(),
+                max_coin_qty: NonZeroU64::new(coin_lots).unwrap(),
+                max_native_pc_qty_including_fees: NonZeroU64::new(u64::MAX).unwrap(),
+                self_trade_behavior: SelfTradeBehavior::AbortTransaction,
+                order_type: serum_dex::matching::OrderType::ImmediateOrCancel,
+                client_order_id: 1,
+                limit: 65535,
+                max_ts: 0,
+            };
+            
 
 
 
-        invoke_signed(
-            &mango::instruction::cancel_all_spot_orders(
+            invoke_signed(
+                &mango::instruction::cancel_all_spot_orders(
+                    mango_program_ai.key,
+                    mango_group_ai.key,
+                    mango_cache_ai.key,
+                    mango_account_ai.key,
+                    fund_pda_ai.key,
+                    base_root_bank_ai.key,
+                    base_node_bank_ai.key,
+                    base_vault_ai.key,
+                    quote_root_bank_ai.key,
+                    quote_node_bank_ai.key,
+                    quote_vault_ai.key,
+                    spot_market_ai.key,
+                    bids_ai.key,
+                    asks_ai.key,
+                    &packed_open_orders[open_orders_index as usize],
+                    signer_ai.key,
+                    dex_event_queue_ai.key,
+                    dex_base_ai.key,
+                    dex_quote_ai.key,
+                    dex_signer_ai.key,
+                    dex_prog_ai.key,
+                    u8::MAX,
+                )?,
+                accounts.clone(),
+                &[&signer_seeds],
+            )?;
+
+
+
+            let val_before = get_mango_net(
+                mango_account_ai,
+                mango_group_ai,
+                mango_cache_ai,
+                mango_program_ai,
+                packed_open_orders_ais
+            )?;
+
+
+            invoke_signed(&mango::instruction::place_spot_order2(
                 mango_program_ai.key,
                 mango_group_ai.key,
-                mango_cache_ai.key,
                 mango_account_ai.key,
                 fund_pda_ai.key,
+                mango_cache_ai.key,
+                dex_prog_ai.key,
+                spot_market_ai.key,
+                bids_ai.key,
+                asks_ai.key,
+                dex_request_queue_ai.key,
+                dex_event_queue_ai.key,
+                dex_base_ai.key,
+                dex_quote_ai.key,
                 base_root_bank_ai.key,
                 base_node_bank_ai.key,
                 base_vault_ai.key,
                 quote_root_bank_ai.key,
+                quote_node_bank_ai.key,
                 quote_vault_ai.key,
-                quote_vault_ai.key,
-                spot_market_ai.key,
-                bids_ai.key,
-                asks_ai.key,
-                &packed_open_orders[open_orders_index as usize],
                 signer_ai.key,
-                dex_event_queue_ai.key,
-                dex_base_ai.key,
-                dex_quote_ai.key,
                 dex_signer_ai.key,
-                dex_prog_ai.key,
-                u8::MAX,
+                msrm_or_srm_vault_ai.key,
+                &packed_open_orders,
+                open_orders_index as usize,
+                order,
             )?,
             accounts.clone(),
             &[&signer_seeds],
-        )?;
+            )?;
 
+            let val_after = get_mango_net(
+                mango_account_ai,
+                mango_group_ai,
+                mango_cache_ai,
+                mango_program_ai,
+                packed_open_orders_ais
+            )?;
 
+            let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
 
-        let val_before = get_mango_net(
-            mango_account_ai,
-            mango_group_ai,
-            mango_cache_ai,
-            mango_program_ai,
-            packed_open_orders_ais
-        )?;
-
-
-        invoke_signed(&mango::instruction::place_spot_order2(
-            mango_program_ai.key,
-            mango_group_ai.key,
-            mango_account_ai.key,
-            fund_pda_ai.key,
-            mango_cache_ai.key,
-            dex_prog_ai.key,
-            spot_market_ai.key,
-            bids_ai.key,
-            asks_ai.key,
-            dex_request_queue_ai.key,
-            dex_event_queue_ai.key,
-            dex_base_ai.key,
-            dex_quote_ai.key,
-            base_root_bank_ai.key,
-            base_node_bank_ai.key,
-            base_vault_ai.key,
-            quote_root_bank_ai.key,
-            quote_vault_ai.key,
-            quote_vault_ai.key,
-            signer_ai.key,
-            dex_signer_ai.key,
-            msrm_or_srm_vault_ai.key,
-            &packed_open_orders,
-            open_orders_index as usize,
-            order,
-        )?,
-        accounts.clone(),
-        &[&signer_seeds],
-        )?;
-
-        let val_after = get_mango_net(
-            mango_account_ai,
-            mango_group_ai,
-            mango_cache_ai,
-            mango_program_ai,
-            packed_open_orders_ais
-        )?;
-
-        let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
-
-        fund_data.force_settle.penalty = fund_data.force_settle.penalty
-            .checked_add(val_before)
-            .unwrap()
-            .checked_sub(val_after)
-            .unwrap();
+            fund_data.force_settle.penalty = fund_data.force_settle.penalty
+                .checked_add(val_before)
+                .unwrap()
+                .checked_sub(val_after)
+                .unwrap();
+        }
         Ok(())
     }
 
@@ -1589,16 +1600,47 @@ impl Fund {
         let instruction =
             FundInstruction::unpack(data).ok_or(ProgramError::InvalidInstructionData)?;
         match instruction {
+
+            FundInstruction::CreatePlatform => {
+                msg!("FundInstruction::CreateLockup");
+                return Self::create_platform(program_id, accounts);
+            }
+
+            FundInstruction::AdminControl { 
+                platform_fee_ratio, 
+                management_fee_ratio, 
+                referral_fee_ratio, 
+                dust_threshold, 
+                taker_fee_cf, 
+                withdrawal_recess_sts, 
+                withdrawal_recess_ets, 
+                enforcement_period_sts
+            } => {
+                msg!("FundInstruction::CreateLockup");
+                return Self::admin_control(
+                    program_id, 
+                    accounts, 
+                    platform_fee_ratio, 
+                    management_fee_ratio, 
+                    referral_fee_ratio, 
+                    dust_threshold, 
+                    taker_fee_cf, 
+                    withdrawal_recess_sts, 
+                    withdrawal_recess_ets, 
+                    enforcement_period_sts
+                )
+            }
+            
             FundInstruction::Initialize {
                 min_amount,
-                performance_fee_bps,
+                performance_fee_ratio,
             } => {
                 msg!("FundInstruction::Initialize");
                 return Self::initialize(
                     program_id,
                     accounts,
                     min_amount,
-                    performance_fee_bps,
+                    performance_fee_ratio,
                 );
             }
             FundInstruction::CreateLockup { amount } => {
@@ -1715,13 +1757,15 @@ pub fn update_amount_and_performance(
     msg!("assets: {:?}, liabs: {:?}", assets, liablities);
     assert!(assets > liablities || fund_data.no_of_investments == 0);
 
+    let tff = ONE_I80F48.checked_sub(platform_data.taker_fee_cf).unwrap();
+
     let usdc_val = mango_account.get_net(
         &mango_cache.root_bank_cache[QUOTE_INDEX],
         QUOTE_INDEX
     );
     let usdc_fee_rebate = if usdc_val > ZERO_I80F48 {
         usdc_val
-        .checked_mul(TFF)
+        .checked_mul(tff)
         .unwrap()
     } else {
         ZERO_I80F48
@@ -1729,7 +1773,7 @@ pub fn update_amount_and_performance(
     let fund_val = assets
         .checked_sub(liablities)
         .unwrap()
-        .checked_mul(TFCF)
+        .checked_mul(platform_data.taker_fee_cf)
         .unwrap()
         .checked_add(usdc_fee_rebate)
         .unwrap();
@@ -1921,9 +1965,7 @@ pub fn compute_returns(
                 .checked_sub(investor_data.amount)
                 .unwrap()
             )
-            .checked_mul(fund_data.performance_fee_percentage)
-            .unwrap()
-            .checked_div(I80F48!(100))
+            .checked_mul(fund_data.performance_fee_ratio)
             .unwrap();
         fund_data.performance_fee = fund_data.performance_fee
             .checked_add(performance_fee)
@@ -2088,7 +2130,9 @@ pub fn get_spot_vals(
         price = u64::MAX;
     }
 
-    if b == a {
+    if !mango_account.in_margin_basket[market_index]{
+        Ok((SerumSide::Ask, 0, 0))
+    } else if b == a {
         Ok((side, price, quantity))
     } else {
         Ok((side, price, quantity + 1))
