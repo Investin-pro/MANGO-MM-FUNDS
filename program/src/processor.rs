@@ -135,11 +135,13 @@ impl Fund {
     pub fn admin_control(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
+        min_amount_limit: u64,
+        performance_fee_ratio_limit: I80F48,
         platform_fee_ratio: I80F48,
         management_fee_ratio: I80F48,
         referral_fee_ratio: I80F48,
         dust_threshold: I80F48,
-        taker_fee_cf: I80F48, //5 bps Taker Fee Correction Factor 
+        taker_fee_cf: I80F48, 
         withdrawal_recess_sts: i64,
         withdrawal_recess_ets: i64,
         enforcement_period_sts: i64,
@@ -170,7 +172,8 @@ impl Fund {
         assert!(enforcement_delay > 43200, "Enforcement Delay Less than 12 Hours");
         assert!(enforcement_period > 7200, "Enforcement Period Less than 2 Hours");
 
-
+        platform_data.min_amount_limit = min_amount_limit;
+        platform_data.performance_fee_ratio_limit = performance_fee_ratio_limit;
         platform_data.platform_fee_ratio = platform_fee_ratio;
         platform_data.management_fee_ratio = management_fee_ratio;
         platform_data.referral_fee_ratio = referral_fee_ratio;
@@ -627,6 +630,33 @@ impl Fund {
 
         investor_data.investment_status = InvestmentStatus::PendingWithdraw;
         fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_add(1).unwrap();
+
+        Ok(())
+    }
+
+    pub fn investor_cancel_withdraw(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+    ) -> Result<(), ProgramError> {
+        const NUM_FIXED: usize = 3;
+        let fixed_ais = array_ref![accounts, 0, NUM_FIXED];
+
+        let [
+            fund_pda_ai,        //Checked on load
+            investor_state_ai,  //Checked on Load
+            investor_ai,        //Chekced for signer
+            ] = fixed_ais;
+
+        let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
+        let mut investor_data = InvestorData::load_mut_checked(investor_state_ai, program_id, fund_pda_ai.key)?;
+        assert_eq!(investor_data.owner, *investor_ai.key);
+        assert_eq!(investor_data.investment_status, InvestmentStatus::Active);
+        assert!(investor_ai.is_signer);
+
+        assert!(!fund_data.paused_for_enforcement);
+        assert!(investor_data.investment_status == InvestmentStatus::PendingWithdraw);
+        investor_data.investment_status = InvestmentStatus::Active;
+        fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_sub(1).unwrap();
 
         Ok(())
     }
@@ -1606,7 +1636,9 @@ impl Fund {
                 return Self::create_platform(program_id, accounts);
             }
 
-            FundInstruction::AdminControl { 
+            FundInstruction::AdminControl {
+                min_amount_limit,
+                performance_fee_ratio_limit, 
                 platform_fee_ratio, 
                 management_fee_ratio, 
                 referral_fee_ratio, 
@@ -1619,7 +1651,9 @@ impl Fund {
                 msg!("FundInstruction::CreateLockup");
                 return Self::admin_control(
                     program_id, 
-                    accounts, 
+                    accounts,
+                    min_amount_limit,
+                    performance_fee_ratio_limit,
                     platform_fee_ratio, 
                     management_fee_ratio, 
                     referral_fee_ratio, 
@@ -1662,6 +1696,10 @@ impl Fund {
             FundInstruction::InvestorRequestWithdraw => {
                 msg!("FundInstruction::InvestorRequestWithdraw");
                 return Self::investor_request_withdraw(program_id, accounts);
+            }
+            FundInstruction::InvestorCancelWithdrawRequest => {
+                msg!("FundInstruction::InvestorRequestWithdraw");
+                return Self::investor_cancel_withdraw(program_id, accounts);
             }
             FundInstruction::ClaimPerformanceFee => {
                 msg!("FundInstruction::ClaimPerformanceFee");

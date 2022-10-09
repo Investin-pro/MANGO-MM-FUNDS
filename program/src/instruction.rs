@@ -15,6 +15,8 @@ pub enum FundInstruction {
     CreatePlatform,
 
     AdminControl {
+        min_amount_limit: u64,
+        performance_fee_ratio_limit: I80F48,
         platform_fee_ratio: I80F48, 
         management_fee_ratio: I80F48, 
         referral_fee_ratio: I80F48, 
@@ -45,6 +47,8 @@ pub enum FundInstruction {
     InvestorWithdraw,
 
     InvestorRequestWithdraw,
+
+    InvestorCancelWithdrawRequest,
 
     ClaimPerformanceFee,
     
@@ -130,8 +134,10 @@ impl FundInstruction {
             17 => FundInstruction::CreatePlatform,
 
             18 => {
-                let data = array_ref![data, 0, 16 + 16 + 16 + 16 + 16 + 8 + 8 + 8];
+                let data = array_ref![data, 0, 8 + 16 + 16 + 16 + 16 + 16 + 16 + 8 + 8 + 8];
                 let (
+                    min_amount,
+                    performance_fee_ratio_limit,
                     platform_fee_ratio, 
                     management_fee_ratio, 
                     referral_fee_ratio, 
@@ -140,9 +146,11 @@ impl FundInstruction {
                     withdrawal_recess_sts, 
                     withdrawal_recess_ets, 
                     enforcement_period_sts
-                ) = array_refs![data, 16, 16, 16, 16, 16, 8, 8, 8];
+                ) = array_refs![data, 8, 16, 16, 16, 16, 16, 16, 8, 8, 8];
 
                 FundInstruction::AdminControl { 
+                    min_amount_limit: u64::from_le_bytes(*min_amount),
+                    performance_fee_ratio_limit: I80F48::from_le_bytes(*performance_fee_ratio_limit),
                     platform_fee_ratio: I80F48::from_le_bytes(*platform_fee_ratio), 
                     management_fee_ratio: I80F48::from_le_bytes(*management_fee_ratio), 
                     referral_fee_ratio: I80F48::from_le_bytes(*referral_fee_ratio), 
@@ -154,6 +162,9 @@ impl FundInstruction {
                 }
 
             }
+
+            19 => FundInstruction::InvestorCancelWithdrawRequest,
+            
 
             _ => {
                 return None;
