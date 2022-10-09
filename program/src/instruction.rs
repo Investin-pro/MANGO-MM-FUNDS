@@ -1,4 +1,5 @@
 use arrayref::{array_ref, array_refs};
+use fixed::types::I80F48;
 use mango::matching::{OrderType, Side};
 use num_enum::TryFromPrimitive;
 use serde::{Serialize, Deserialize};
@@ -10,10 +11,25 @@ use crate::processor::Fund;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 
 pub enum FundInstruction {
+
+    CreatePlatform,
+
+    AdminControl {
+        min_amount_limit: u64,
+        performance_fee_ratio_limit: I80F48,
+        platform_fee_ratio: I80F48, 
+        management_fee_ratio: I80F48, 
+        referral_fee_ratio: I80F48, 
+        dust_threshold: I80F48, 
+        taker_fee_cf: I80F48, 
+        withdrawal_recess_sts: i64, 
+        withdrawal_recess_ets: i64, 
+        enforcement_period_sts: i64
+    },
     
     Initialize {
         min_amount: u64,
-        performance_fee_bps: u64,
+        performance_fee_ratio: I80F48,
     },
 
     InvestorDeposit {
@@ -32,6 +48,8 @@ pub enum FundInstruction {
 
     InvestorRequestWithdraw,
 
+    InvestorCancelWithdrawRequest,
+
     ClaimPerformanceFee,
     
     ProcessDeposits,
@@ -40,7 +58,7 @@ pub enum FundInstruction {
 
     SetMangoDelegate,
 
-    PauseForSettlement,
+    PauseForEnforcement,
 
     InitForceSettle,
 
@@ -64,12 +82,12 @@ impl FundInstruction {
         let op = u32::from_le_bytes(op);
         Some(match op {
             0 => {
-                let data = array_ref![data, 0, 8 + 8];
-                let (min_amount, performance_fee_bps) = array_refs![data, 8, 8];
+                let data = array_ref![data, 0, 8 + 16];
+                let (min_amount, performance_fee_ratio) = array_refs![data, 8, 16];
 
                 FundInstruction::Initialize {
                     min_amount: u64::from_le_bytes(*min_amount),
-                    performance_fee_bps: u64::from_le_bytes(*performance_fee_bps),
+                    performance_fee_ratio: I80F48::from_le_bytes(*performance_fee_ratio),
                 }
             }
             1 => {
@@ -84,7 +102,7 @@ impl FundInstruction {
             5 => FundInstruction::ProcessWithdraws,
             6 => FundInstruction::ClaimPerformanceFee,
             7 => FundInstruction::SetMangoDelegate,
-            8 => FundInstruction::PauseForSettlement,
+            8 => FundInstruction::PauseForEnforcement,
             9 => FundInstruction::InitForceSettle,
             10 => FundInstruction::ForceUpdatePerp,
             11 => {
@@ -113,6 +131,41 @@ impl FundInstruction {
 
             16 => FundInstruction::ReleaseLockup,
 
+            17 => FundInstruction::CreatePlatform,
+
+            18 => {
+                let data = array_ref![data, 0, 8 + 16 + 16 + 16 + 16 + 16 + 16 + 8 + 8 + 8];
+                let (
+                    min_amount,
+                    performance_fee_ratio_limit,
+                    platform_fee_ratio, 
+                    management_fee_ratio, 
+                    referral_fee_ratio, 
+                    dust_threshold, 
+                    taker_fee_cf, 
+                    withdrawal_recess_sts, 
+                    withdrawal_recess_ets, 
+                    enforcement_period_sts
+                ) = array_refs![data, 8, 16, 16, 16, 16, 16, 16, 8, 8, 8];
+
+                FundInstruction::AdminControl { 
+                    min_amount_limit: u64::from_le_bytes(*min_amount),
+                    performance_fee_ratio_limit: I80F48::from_le_bytes(*performance_fee_ratio_limit),
+                    platform_fee_ratio: I80F48::from_le_bytes(*platform_fee_ratio), 
+                    management_fee_ratio: I80F48::from_le_bytes(*management_fee_ratio), 
+                    referral_fee_ratio: I80F48::from_le_bytes(*referral_fee_ratio), 
+                    dust_threshold: I80F48::from_le_bytes(*dust_threshold), 
+                    taker_fee_cf: I80F48::from_le_bytes(*taker_fee_cf), 
+                    withdrawal_recess_sts: i64::from_le_bytes(*withdrawal_recess_sts), 
+                    withdrawal_recess_ets: i64::from_le_bytes(*withdrawal_recess_ets), 
+                    enforcement_period_sts: i64::from_le_bytes(*enforcement_period_sts) 
+                }
+
+            }
+
+            19 => FundInstruction::InvestorCancelWithdrawRequest,
+            
+
             _ => {
                 return None;
             }
@@ -134,7 +187,7 @@ pub fn initialize(
     delegate_pk: &Pubkey,
     system_program_pk: &Pubkey,
     min_amount: u64,
-    performance_fee_bps: u64
+    performance_fee_ratio: I80F48
 ) -> Result<Instruction, ProgramError> {
     let accounts = vec![
         AccountMeta::new(*manager_pk, true),
@@ -147,7 +200,7 @@ pub fn initialize(
         AccountMeta::new_readonly(*system_program_pk, false)
     ];
 
-    let instr = FundInstruction::Initialize { min_amount, performance_fee_bps};
+    let instr = FundInstruction::Initialize { min_amount, performance_fee_ratio};
     let data = instr.pack();
     Ok(Instruction { program_id: *program_id, accounts, data })
 }

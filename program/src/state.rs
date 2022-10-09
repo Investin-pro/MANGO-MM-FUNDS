@@ -45,7 +45,7 @@ pub struct FundData {
     pub is_initialized: bool,
     pub signer_nonce: u8,
     pub is_public: bool,
-    pub paused_for_settlement: bool,
+    pub paused_for_enforcement: bool,
     pub no_of_investments: u32,
     pub no_of_pending_withdrawals: u32,
     pub no_of_settle_withdrawals: u32,
@@ -54,7 +54,7 @@ pub struct FundData {
     pub min_amount: u64,
 
     /// Performance Fee Percentage
-    pub performance_fee_percentage: I80F48,
+    pub performance_fee_ratio: I80F48,
 
     /// Fund AUM
     pub total_amount: I80F48,
@@ -106,6 +106,29 @@ pub struct ForceSettleData {
     pub padding: u8,
     pub penalty: I80F48
 } impl_loadable!(ForceSettleData);
+
+#[repr(packed)]
+#[derive(Clone, Copy)]
+pub struct PlatformData {
+    pub is_initialized: bool,
+    pub signer_nonce: u8,
+    pub padding: [u8; 6],
+    pub admin: Pubkey,
+    pub default_referrer: Pubkey,
+    pub platform_usdc_vault: Pubkey,
+    pub min_amount_limit: u64,
+    pub performance_fee_ratio_limit: I80F48,
+    pub platform_fee_ratio: I80F48,
+    pub management_fee_ratio: I80F48,
+    pub referral_fee_ratio: I80F48,
+    pub dust_threshold: I80F48,
+    pub taker_fee_cf: I80F48, //5 bps Taker Fee Correction Factor 
+    pub withdrawal_recess_sts: i64,
+    pub withdrawal_recess_ets: i64,
+    pub enforcement_period_sts: i64,
+    pub extra_padding: [u8; 256]
+}
+impl_loadable!(PlatformData);
 
 
 #[repr(packed)]
@@ -160,6 +183,13 @@ impl IsInitialized for FundData {
     }
 }
 
+impl Sealed for PlatformData {}
+impl IsInitialized for PlatformData {
+    fn is_initialized(&self) -> bool {
+        self.is_initialized
+    }
+}
+
 impl FundData {
     pub fn load_mut_checked<'a>(
         account: &'a AccountInfo,
@@ -190,6 +220,35 @@ impl FundData {
         let spot_settled = self.force_settle.spot.iter().eq(&[false; MAX_PAIRS]);
         let perp_settled = self.force_settle.perps.iter().eq(&[false; MAX_PAIRS]);
         Ok((spot_settled, perp_settled))
+    }
+}
+
+impl PlatformData {
+    pub fn load_mut_checked<'a>(
+        account: &'a AccountInfo,
+        program_id: &Pubkey,
+    ) -> Result<RefMut<'a, Self>, ProgramError> {
+        assert_eq!(account.data_len(), size_of::<Self>());
+        assert_eq!(account.owner, program_id);
+        let (platform_pda, _) = Pubkey::find_program_address(&[b"Platform"], program_id);
+        assert_eq!(*account.key, platform_pda, "Seeds Mismatch");
+        let data = Self::load_mut(account)?;
+        assert!(data.is_initialized());
+
+        Ok(data)
+    }
+    pub fn load_checked<'a>(
+        account: &'a AccountInfo,
+        program_id: &Pubkey,
+    ) -> Result<Ref<'a, Self>, ProgramError> {
+        assert_eq!(account.data_len(), size_of::<Self>());
+        assert_eq!(account.owner, program_id);
+        let (platform_pda, _) = Pubkey::find_program_address(&[b"Platform"], program_id);
+        assert_eq!(*account.key, platform_pda, "Seeds Mismatch");
+        let data = Self::load(account)?;
+        assert!(data.is_initialized());
+        
+        Ok(data)
     }
 }
 
