@@ -32,6 +32,8 @@ pub enum FundInstruction {
 
     InvestorRequestWithdraw,
 
+    InvestorCancelWithdrawRequest,
+
     ClaimPerformanceFee,
     
     ProcessDeposits,
@@ -112,6 +114,8 @@ impl FundInstruction {
             }
 
             16 => FundInstruction::ReleaseLockup,
+
+            17 => FundInstruction::InvestorCancelWithdrawRequest,
 
             _ => {
                 return None;
