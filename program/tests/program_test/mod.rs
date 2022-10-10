@@ -22,7 +22,6 @@ use solana_sdk::{
     instruction::Instruction,
     signature::{Keypair, Signer},
     transaction::Transaction,
-    transport::TransportError,
 };
 use spl_token::{state::*, *};
 
@@ -101,7 +100,7 @@ impl MangoProgramTestConfig {
     #[allow(dead_code)]
     pub fn default() -> Self {
         MangoProgramTestConfig {
-            compute_limit: 200_000,
+            compute_limit: 1_400_000,
             num_users: 2,
             num_mints: 16,
             consume_perp_events_count: 3,
@@ -161,7 +160,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 3,
@@ -169,7 +168,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 1000 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "ETH".to_string()
             MintCookie {
                 index: 4,
@@ -177,7 +176,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(9) as f64,
                 base_lot: 100000000 as f64,
                 quote_lot: 100 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "SOL".to_string()
             MintCookie {
                 index: 5,
@@ -185,7 +184,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100000 as f64,
                 quote_lot: 100 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "SRM".to_string()
             MintCookie {
                 index: 6,
@@ -193,7 +192,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 7,
@@ -201,7 +200,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 8,
@@ -209,7 +208,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 9,
@@ -217,7 +216,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 10,
@@ -225,7 +224,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 11,
@@ -233,7 +232,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 12,
@@ -241,7 +240,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 13,
@@ -249,7 +248,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 14,
@@ -257,7 +256,7 @@ impl MangoProgramTest {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: None,
+                pubkey: Some(Pubkey::new_unique()),
             }, // symbol: "BTC".to_string()
             MintCookie {
                 index: 15,
@@ -277,7 +276,7 @@ impl MangoProgramTest {
         quote_mint.index = quote_index;
         mints[quote_index] = quote_mint;
 
-        let mut test = ProgramTest::new("mm", investin_program_id, processor!(process_instruction));
+        let mut test = ProgramTest::new("investin", investin_program_id, processor!(process_instruction));
         test.add_program("mango", mango_program_id, processor!(process_mango_instruction));
         test.add_program("serum_dex", serum_program_id, processor!(process_serum_instruction));
         // TODO: add more programs (oracles)
@@ -397,7 +396,7 @@ impl MangoProgramTest {
         &mut self,
         instructions: &[Instruction],
         signers: Option<&[&Keypair]>,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mut transaction =
             Transaction::new_with_payer(&instructions, Some(&self.context.payer.pubkey()));
 
@@ -1494,7 +1493,7 @@ impl MangoProgramTest {
         user_index: usize,
         delegate_user_index: usize,
         order: NewOrderInstructionV3,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = self.mango_program_id;
         let serum_program_id = self.serum_program_id;
         let mango_group = mango_group_cookie.mango_group;
@@ -1696,7 +1695,7 @@ impl MangoProgramTest {
         user_index: usize,
         mint_index: usize,
         amount: u64,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = self.mango_program_id;
         let mango_group = mango_group_cookie.mango_group;
         let mango_group_pk = mango_group_cookie.address;
@@ -1732,7 +1731,7 @@ impl MangoProgramTest {
         mint_index: usize,
         quantity: u64,
         allow_borrow: bool,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = self.mango_program_id;
         let mango_group = mango_group_cookie.mango_group;
         let mango_group_pk = mango_group_cookie.address;
@@ -1776,7 +1775,7 @@ impl MangoProgramTest {
         mint_index: usize,
         quantity: u64,
         allow_borrow: bool,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = self.mango_program_id;
         let mango_group = mango_group_cookie.mango_group;
         let mango_group_pk = mango_group_cookie.address;
@@ -1820,7 +1819,7 @@ impl MangoProgramTest {
         mint_index: usize,
         quantity: u64,
         allow_borrow: bool,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = self.mango_program_id;
         let mango_group = mango_group_cookie.mango_group;
         let mango_group_pk = mango_group_cookie.address;
@@ -2066,7 +2065,7 @@ impl MangoProgramTest {
         market_index: usize,
         market_mode: MarketMode,
         market_type: AssetType,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = self.mango_program_id;
         let mango_group_pk = mango_group_cookie.address;
 
@@ -2091,7 +2090,7 @@ impl MangoProgramTest {
         market_mode: MarketMode,
         market_type: AssetType,
         user_index: usize,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = self.mango_program_id;
         let mango_group_pk = mango_group_cookie.address;
         let user = Keypair::from_base58_string(&self.users[user_index].to_base58_string());
@@ -2115,7 +2114,7 @@ impl MangoProgramTest {
         liqor_index: usize,
         liab_index: usize,
         asset_index: usize,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = self.mango_program_id;
         let mango_group = mango_group_cookie.mango_group;
         let mango_group_pk = mango_group_cookie.address;

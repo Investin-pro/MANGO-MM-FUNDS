@@ -9,7 +9,7 @@ use solana_program_test::*;
 async fn test_mm_scenario() {
     // === Arrange ===
     let config =
-        MangoProgramTestConfig { num_users: 2, ..MangoProgramTestConfig::default_two_mints() };
+        MangoProgramTestConfig { num_users: 2, ..MangoProgramTestConfig::default() };
 
     let mut test = MangoProgramTest::start_new(&config).await;
 

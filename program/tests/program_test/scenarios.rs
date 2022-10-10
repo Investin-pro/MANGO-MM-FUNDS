@@ -1,5 +1,4 @@
 use crate::*;
-use solana_sdk::transport::TransportError;
 
 #[allow(dead_code)]
 pub fn arrange_deposit_all_scenario(
@@ -61,7 +60,7 @@ pub async fn withdraw_scenario_with_delegate(
     test: &mut MangoProgramTest,
     mango_group_cookie: &mut MangoGroupCookie,
     withdraw: &(usize, usize, usize, f64, bool),
-) -> Result<(), TransportError> {
+) -> Result<(), BanksClientError> {
     mango_group_cookie.run_keeper(test).await;
 
     let (user_index, delegate_user_index, mint_index, amount, allow_borrow) = withdraw;
@@ -121,7 +120,7 @@ pub async fn place_spot_order_scenario_with_delegate(
     test: &mut MangoProgramTest,
     mango_group_cookie: &mut MangoGroupCookie,
     spot_order: &(usize, usize, usize, serum_dex::matching::Side, f64, f64),
-) -> Result<(), TransportError> {
+) -> Result<(), BanksClientError> {
     mango_group_cookie.run_keeper(test).await;
 
     let (user_index, delegate_user_index, market_index, order_side, order_size, order_price) =

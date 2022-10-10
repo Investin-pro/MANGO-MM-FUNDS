@@ -422,7 +422,7 @@ impl InvestinFundCookie {
         println!("derived mango seeds {:?}", mango_seeds);
         println!("program_id {:?}", mango_program_id);
         println!("derived mango account {:?}", mango_account_pk);
-        let instructions = [mm::instruction::initialize(
+        let instructions = [investin::instruction::initialize(
             &investin_program_id, 
             &manager_pk, 
             &investin_fund_pk, 

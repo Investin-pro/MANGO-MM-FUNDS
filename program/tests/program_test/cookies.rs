@@ -5,7 +5,6 @@ use fixed::types::I80F48;
 use investin::state::FundData;
 use solana_program::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, Signer};
-use solana_sdk::transport::TransportError;
 
 use mango::{ids::*, matching::*, queue::*, state::*, utils::*, instruction};
 use spl_associated_token_account::tools::account;
@@ -413,16 +412,17 @@ impl InvestinFundCookie {
         let (investin_fund_pk, _) = Pubkey::find_program_address(investin_seeds, &investin_program_id);
 
     
-        let fund_usdc_vault_pk = test.create_token_account(&investin_fund_pk, &test.mints[1].pubkey.unwrap()).await;
+        let fund_usdc_vault_pk = test.create_token_account(&investin_fund_pk, &test.mints[test.mints.len() - 1].pubkey.unwrap()).await;
         // let account_num :u64 = 0;
         // let mango_seeds: &[&[u8]] = &[&mango_group_cookie.address.as_ref(), &investin_fund_pk.as_ref(), &account_num.to_le_bytes()];
         let mango_seeds: &[&[u8]] = &[&mango_group_cookie.address.as_ref(), &investin_fund_pk.as_ref(), &0_u64.to_le_bytes()];
         
         let (mango_account_pk, _) = Pubkey::find_program_address(mango_seeds, &mango_program_id);
-        println!("derived mango seeds {:?}", mango_seeds);
         println!("program_id {:?}", mango_program_id);
         println!("derived mango account {:?}", mango_account_pk);
-        let instructions = [mm::instruction::initialize(
+        println!("mango Group:: {:?}", mango_group_cookie.address);
+
+        let instructions = [investin::instruction::initialize(
             &investin_program_id, 
             &manager_pk, 
             &investin_fund_pk, 
@@ -485,7 +485,7 @@ impl AdvancedOrdersCookie {
         mango_group_cookie: &mut MangoGroupCookie,
         user_index: usize,
         order_index: u8,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = test.mango_program_id;
         let mango_account_cookie = &mango_group_cookie.mango_accounts[user_index];
         let mango_account_pk = mango_account_cookie.address;
@@ -680,7 +680,7 @@ impl SpotMarketCookie {
         side: serum_dex::matching::Side,
         size: f64,
         price: f64,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let limit_price = test.price_number_to_lots(&self.mint, price);
         let max_coin_qty = test.base_size_number_to_lots(&self.mint, size);
         let max_native_pc_qty_including_fees = match side {
@@ -935,7 +935,7 @@ impl PerpMarketCookie {
         user_index: usize,
         agent_user_index: usize,
         order_index: u8,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let mango_program_id = test.mango_program_id;
         let mango_account_cookie = &mango_group_cookie.mango_accounts[user_index];
         let mango_account_pk = mango_account_cookie.address;
