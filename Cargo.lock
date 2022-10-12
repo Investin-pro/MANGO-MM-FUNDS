@@ -1741,6 +1741,7 @@ dependencies = [
 name = "investin"
 version = "0.0.2"
 dependencies = [
+ "anchor-lang",
  "arrayref",
  "bincode",
  "bs58 0.4.0",

@@ -29,9 +29,7 @@ mango = { version = "^3.5.1", git = "https://github.com/blockworks-foundation/ma
 mango-common = {version = "3.0.0", git = "https://github.com/blockworks-foundation/mango-v3", branch = "main" }
 spl-associated-token-account = { version = "1.0.5", features = ["no-entrypoint"] }
 serum_dex = { rev = "7f55a5ef5f7937b74381a3124021a261cd7d7283", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
-
-
-
+anchor-lang = ">=0.24.2"
 
 
 [dev-dependencies]
