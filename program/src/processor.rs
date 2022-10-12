@@ -525,7 +525,6 @@ impl Fund {
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
         let mut investor_data = InvestorData::load_mut_checked(investor_state_ai, program_id, fund_pda_ai.key)?;
         assert_eq!(investor_data.owner, *investor_ai.key);
-        assert_eq!(investor_data.investment_status, InvestmentStatus::Active);
         assert!(investor_ai.is_signer);
 
         assert!(!fund_data.paused_for_settlement);
@@ -1521,7 +1520,7 @@ impl Fund {
                 return Self::investor_request_withdraw(program_id, accounts);
             }
             FundInstruction::InvestorCancelWithdrawRequest => {
-                msg!("FundInstruction::InvestorRequestWithdraw");
+                msg!("FundInstruction::InvestorCancelRequestWithdraw");
                 return Self::investor_cancel_withdraw(program_id, accounts);
             }
             FundInstruction::ClaimPerformanceFee => {
