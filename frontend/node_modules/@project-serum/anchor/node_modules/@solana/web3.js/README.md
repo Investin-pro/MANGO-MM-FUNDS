@@ -23,7 +23,10 @@
 
 This is the Solana Javascript API built on the Solana [JSON RPC API](https://docs.solana.com/apps/jsonrpc-api)
 
-[Latest API Documentation](https://solana-labs.github.io/solana-web3.js/)
+## Documentation and examples
+
+ - [The Solana Cookbook](https://solanacookbook.com/) has extensive task-based documentation using this library.
+ - For more detail on individual functions, see the [latest API Documentation](https://solana-labs.github.io/solana-web3.js/)
 
 ## Installation
 
@@ -84,20 +87,29 @@ console.log(solanaWeb3);
 console.log(solanaWeb3);
 ```
 
-## Examples
+## Compatibility
 
-Example scripts for the web3.js repo and native programs:
+This library requires a JavaScript runtime that supports [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) and the [exponentiation operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Exponentiation). Both are supported in the following runtimes:
 
-- [Web3 Examples](https://github.com/solana-labs/solana/tree/master/web3.js/examples)
+- Browsers, by [release date](https://caniuse.com/bigint):
+  - Chrome: May 2018
+  - Firefox: July 2019
+  - Safari: September 2020
+  - Mobile Safari: September 2020
+  - Edge: January 2020
+  - Opera: June 2018
+  - Samsung Internet: April 2019
+- Runtimes, [by version](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt):
+  - Deno: >=1.0
+  - Node: >=10.4.0
+- React Native:
+  - \>=0.7.0 using the [Hermes](https://reactnative.dev/blog/2022/07/08/hermes-as-the-default) engine ([integration guide](https://solanacookbook.com/integrations/react-native.html#how-to-use-solana-web3-js-in-a-react-native-app)):
 
-Example scripts for the Solana Program Library:
+## Flow Support (Discontinued)
 
-- [Token Program Examples](https://github.com/solana-labs/solana-program-library/tree/master/token/js/examples)
-
-## Flow
-
-A [Flow library definition](https://flow.org/en/docs/libdefs/) is provided at
-https://unpkg.com/@solana/web3.js@latest/module.flow.js.
+Flow types are no longer supported in new releases. The last release with Flow support is v1.37.2 and its
+[Flow library definition](https://flow.org/en/docs/libdefs/) is provided at
+https://unpkg.com/@solana/web3.js@v1.37.2/module.flow.js.
 Download the file and add the following line under the [libs] section of your project's `.flowconfig` to
 activate it:
 
@@ -114,6 +126,10 @@ and [npmjs.com](https://www.npmjs.com/package/@solana/web3.js)
 Each Github release features a tarball containing API documentation and a
 minified version of the module suitable for direct use in a browser environment
 (`<script>` tag)
+
+## Contributing
+
+If you have an issue to report or would like to contribute a pull request, please do so against the monorepo at https://github.com/solana-labs/solana. We are not able to merge pull requests into the mirror repo https://github.com/solana-labs/solana-web3.js and issues filed there may go unnoticed.
 
 ## Disclaimer
 

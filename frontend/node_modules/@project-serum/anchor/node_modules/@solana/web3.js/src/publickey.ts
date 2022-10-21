@@ -1,11 +1,11 @@
 import BN from 'bn.js';
 import bs58 from 'bs58';
 import {Buffer} from 'buffer';
-import nacl from 'tweetnacl';
-import {sha256} from '@ethersproject/sha2';
+import {sha256} from '@noble/hashes/sha256';
 
-import {Struct, SOLANA_SCHEMA} from './util/borsh-schema';
-import {toBuffer} from './util/to-buffer';
+import {isOnCurve} from './utils/ed25519';
+import {Struct, SOLANA_SCHEMA} from './utils/borsh-schema';
+import {toBuffer} from './utils/to-buffer';
 
 /**
  * Maximum length of derived pubkey seed
@@ -13,12 +13,16 @@ import {toBuffer} from './util/to-buffer';
 export const MAX_SEED_LENGTH = 32;
 
 /**
+ * Size of public key in bytes
+ */
+export const PUBLIC_KEY_LENGTH = 32;
+
+/**
  * Value to be converted into public key
  */
 export type PublicKeyInitData =
   | number
   | string
-  | Buffer
   | Uint8Array
   | Array<number>
   | PublicKeyData;
@@ -34,6 +38,9 @@ export type PublicKeyData = {
 function isPublicKeyData(value: PublicKeyInitData): value is PublicKeyData {
   return (value as PublicKeyData)._bn !== undefined;
 }
+
+// local counter used by PublicKey.unique()
+let uniquePublicKeyCounter = 1;
 
 /**
  * A public key
@@ -54,7 +61,7 @@ export class PublicKey extends Struct {
       if (typeof value === 'string') {
         // assume base 58 encoding by default
         const decoded = bs58.decode(value);
-        if (decoded.length != 32) {
+        if (decoded.length != PUBLIC_KEY_LENGTH) {
           throw new Error(`Invalid public key input`);
         }
         this._bn = new BN(decoded);
@@ -69,7 +76,17 @@ export class PublicKey extends Struct {
   }
 
   /**
-   * Default public key value. (All zeros)
+   * Returns a unique PublicKey for tests and benchmarks using acounter
+   */
+  static unique(): PublicKey {
+    const key = new PublicKey(uniquePublicKeyCounter);
+    uniquePublicKeyCounter += 1;
+    return new PublicKey(key.toBuffer());
+  }
+
+  /**
+   * Default public key value. The base58-encoded string representation is all ones (as seen below)
+   * The underlying BN number is 32 bytes that are all zeros
    */
   static default: PublicKey = new PublicKey('11111111111111111111111111111111');
 
@@ -103,7 +120,7 @@ export class PublicKey extends Struct {
    */
   toBuffer(): Buffer {
     const b = this._bn.toArrayLike(Buffer);
-    if (b.length === 32) {
+    if (b.length === PUBLIC_KEY_LENGTH) {
       return b;
     }
 
@@ -135,18 +152,18 @@ export class PublicKey extends Struct {
       Buffer.from(seed),
       programId.toBuffer(),
     ]);
-    const hash = sha256(new Uint8Array(buffer)).slice(2);
-    return new PublicKey(Buffer.from(hash, 'hex'));
+    const publicKeyBytes = sha256(buffer);
+    return new PublicKey(publicKeyBytes);
   }
 
   /**
    * Derive a program address from seeds and a program ID.
    */
   /* eslint-disable require-await */
-  static async createProgramAddress(
+  static createProgramAddressSync(
     seeds: Array<Buffer | Uint8Array>,
     programId: PublicKey,
-  ): Promise<PublicKey> {
+  ): PublicKey {
     let buffer = Buffer.alloc(0);
     seeds.forEach(function (seed) {
       if (seed.length > MAX_SEED_LENGTH) {
@@ -159,12 +176,23 @@ export class PublicKey extends Struct {
       programId.toBuffer(),
       Buffer.from('ProgramDerivedAddress'),
     ]);
-    let hash = sha256(new Uint8Array(buffer)).slice(2);
-    let publicKeyBytes = new BN(hash, 16).toArray(undefined, 32);
-    if (is_on_curve(publicKeyBytes)) {
+    const publicKeyBytes = sha256(buffer);
+    if (isOnCurve(publicKeyBytes)) {
       throw new Error(`Invalid seeds, address must fall off the curve`);
     }
     return new PublicKey(publicKeyBytes);
+  }
+
+  /**
+   * Async version of createProgramAddressSync
+   * For backwards compatibility
+   */
+  /* eslint-disable require-await */
+  static async createProgramAddress(
+    seeds: Array<Buffer | Uint8Array>,
+    programId: PublicKey,
+  ): Promise<PublicKey> {
+    return this.createProgramAddressSync(seeds, programId);
   }
 
   /**
@@ -174,16 +202,16 @@ export class PublicKey extends Struct {
    * iterates a nonce until it finds one that when combined with the seeds
    * results in a valid program address.
    */
-  static async findProgramAddress(
+  static findProgramAddressSync(
     seeds: Array<Buffer | Uint8Array>,
     programId: PublicKey,
-  ): Promise<[PublicKey, number]> {
+  ): [PublicKey, number] {
     let nonce = 255;
     let address;
     while (nonce != 0) {
       try {
         const seedsWithNonce = seeds.concat(Buffer.from([nonce]));
-        address = await this.createProgramAddress(seedsWithNonce, programId);
+        address = this.createProgramAddressSync(seedsWithNonce, programId);
       } catch (err) {
         if (err instanceof TypeError) {
           throw err;
@@ -197,10 +225,22 @@ export class PublicKey extends Struct {
   }
 
   /**
+   * Async version of findProgramAddressSync
+   * For backwards compatibility
+   */
+  static async findProgramAddress(
+    seeds: Array<Buffer | Uint8Array>,
+    programId: PublicKey,
+  ): Promise<[PublicKey, number]> {
+    return this.findProgramAddressSync(seeds, programId);
+  }
+
+  /**
    * Check that a pubkey is on the ed25519 curve.
    */
-  static isOnCurve(pubkey: Uint8Array): boolean {
-    return is_on_curve(pubkey) == 1;
+  static isOnCurve(pubkeyData: PublicKeyInitData): boolean {
+    const pubkey = new PublicKey(pubkeyData);
+    return isOnCurve(pubkey.toBytes());
   }
 }
 
@@ -208,66 +248,3 @@ SOLANA_SCHEMA.set(PublicKey, {
   kind: 'struct',
   fields: [['_bn', 'u256']],
 });
-
-// @ts-ignore
-let naclLowLevel = nacl.lowlevel;
-
-// Check that a pubkey is on the curve.
-// This function and its dependents were sourced from:
-// https://github.com/dchest/tweetnacl-js/blob/f1ec050ceae0861f34280e62498b1d3ed9c350c6/nacl.js#L792
-function is_on_curve(p: any) {
-  var r = [
-    naclLowLevel.gf(),
-    naclLowLevel.gf(),
-    naclLowLevel.gf(),
-    naclLowLevel.gf(),
-  ];
-
-  var t = naclLowLevel.gf(),
-    chk = naclLowLevel.gf(),
-    num = naclLowLevel.gf(),
-    den = naclLowLevel.gf(),
-    den2 = naclLowLevel.gf(),
-    den4 = naclLowLevel.gf(),
-    den6 = naclLowLevel.gf();
-
-  naclLowLevel.set25519(r[2], gf1);
-  naclLowLevel.unpack25519(r[1], p);
-  naclLowLevel.S(num, r[1]);
-  naclLowLevel.M(den, num, naclLowLevel.D);
-  naclLowLevel.Z(num, num, r[2]);
-  naclLowLevel.A(den, r[2], den);
-
-  naclLowLevel.S(den2, den);
-  naclLowLevel.S(den4, den2);
-  naclLowLevel.M(den6, den4, den2);
-  naclLowLevel.M(t, den6, num);
-  naclLowLevel.M(t, t, den);
-
-  naclLowLevel.pow2523(t, t);
-  naclLowLevel.M(t, t, num);
-  naclLowLevel.M(t, t, den);
-  naclLowLevel.M(t, t, den);
-  naclLowLevel.M(r[0], t, den);
-
-  naclLowLevel.S(chk, r[0]);
-  naclLowLevel.M(chk, chk, den);
-  if (neq25519(chk, num)) naclLowLevel.M(r[0], r[0], I);
-
-  naclLowLevel.S(chk, r[0]);
-  naclLowLevel.M(chk, chk, den);
-  if (neq25519(chk, num)) return 0;
-  return 1;
-}
-let gf1 = naclLowLevel.gf([1]);
-let I = naclLowLevel.gf([
-  0xa0b0, 0x4a0e, 0x1b27, 0xc4ee, 0xe478, 0xad2f, 0x1806, 0x2f43, 0xd7a7,
-  0x3dfb, 0x0099, 0x2b4d, 0xdf0b, 0x4fc1, 0x2480, 0x2b83,
-]);
-function neq25519(a: any, b: any) {
-  var c = new Uint8Array(32),
-    d = new Uint8Array(32);
-  naclLowLevel.pack25519(c, a);
-  naclLowLevel.pack25519(d, b);
-  return naclLowLevel.crypto_verify_32(c, 0, d, 0);
-}
