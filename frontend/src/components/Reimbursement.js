@@ -1,5 +1,5 @@
 import { PublicKey, Transaction, TransactionInstruction, create, Account, SystemProgram, Keypair, SYSVAR_RENT_PUBKEY} from '@solana/web3.js';
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { GlobalState } from '../store/globalState';
 import { connection, programId, platformStateAccount, FUND_ACCOUNT_KEY, TOKEN_PROGRAM_ID, MANGO_RE_IMBURSEMENT_PROG_ID, SYSTEM_PROGRAM_ID } from '../utils/constants';
 import { nu64, struct, u32 } from 'buffer-layout';
@@ -11,16 +11,116 @@ import { MangoV3ReimbursementClient } from "@blockworks-foundation/mango-v3-reim
 import { AnchorProvider } from "@project-serum/anchor";
 import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet";
 import { initializeAccount } from '@project-serum/serum/lib/token-instructions';
+import { Config } from "@blockworks-foundation/mango-client";
+
+const GROUP_NUM = 1
+
+export async function tryDecodeTable(reimbursementClient, group) {
+  try {
+    const table = await reimbursementClient.decodeTable(group.account);
+    return table;
+  } catch (e) {
+    return null;
+    //silent error
+  }
+}
 
 export const Reimbursement = () => {
 
   const [amount, setAmount] = useState(0);
   const [fundPDA, setFundPDA] = useState('');
   const [funds, setFunds] = useState([]);
+  const [claimTokensTable, setClaimTokensTable] = useState([]);
 
 
   const walletProvider = GlobalState.useState(s => s.walletProvider);
   const ids = IDS['groups'][0]
+
+  const doSomething = async () => {
+    const key = walletProvider?.publicKey;
+
+    if(fundPDA === '') return
+
+    if (!key) {
+      alert("connect wallet")
+      return;
+    };
+
+    // MangoV3ReimbursementClient
+    const options = AnchorProvider.defaultOptions();
+    const provider = new AnchorProvider(
+      connection,
+      walletProvider,
+      options
+    );
+    const mangoV3ReimbursementClient = new MangoV3ReimbursementClient(provider);
+
+    const result = await mangoV3ReimbursementClient.program.account.group.all()
+    console.log('result ::: ', result)
+    const group = result.find((group) => group.account.groupNum === GROUP_NUM);
+    console.log("group:",group.publicKey.toBase58())
+
+    const config = Config.ids();
+    const groupIds = IDS.groups.find(f => f.name === 'mainnet.1');
+    console.log('groupIds :: ', groupIds)
+    console.log('config :>> ', config);
+    const table = await tryDecodeTable(mangoV3ReimbursementClient, group);
+    const tableIndex = table.findIndex((row) =>
+    row.owner.equals(new PublicKey(fundPDA))
+  )
+    console.log('table :>> ', table);
+
+    const balancesForUser = table.find((row) =>
+        row.owner.equals(new PublicKey(fundPDA))
+      )?.balances;
+      console.log('balancesForUser :>> ', balancesForUser);
+      if (balancesForUser) {
+        const indexesToUse = [];
+        for (let i in balancesForUser) {
+          const isZero = balancesForUser[i].isZero();
+          if (!isZero) {
+            indexesToUse.push(Number(i));
+          }
+        }
+        const tableInfo = [
+          ...indexesToUse.map((idx) => {
+            return {
+              nativeAmount: balancesForUser[idx],
+              mintPubKey: group.account.mints[idx],
+              index: idx,
+              tableIndex
+            };
+          }),
+        ];
+        const mintPks = tableInfo.map((x) => x.mintPubKey);
+        const mints = await Promise.all(
+          mintPks.map((x) => connection.getParsedAccountInfo(x))
+        );
+        const mintInfos = {};
+        for (let i = 0; i < mintPks.length; i++) {
+          const mintPk = mintPks[i];
+          mintInfos[mintPk.toBase58()] = {
+            decimals: (mints[i].value?.data).parsed.info.decimals,
+            symbol: groupIds.tokens.find(
+              (x) => x.mintKey === mintPk.toBase58()
+            )?.symbol,
+          };
+        }
+        console.log('mintInfos ::: ', mintInfos)
+        console.log('tableInfo :>> ', tableInfo);
+        setClaimTokensTable(tableInfo)
+        console.log('group ::: ', group)
+      } else {
+        // resetAmountState();
+        setClaimTokensTable([])
+        console.error("errrrr>>>>>")
+      }
+  }
+
+  useEffect(() => {
+    doSomething()
+  }, [fundPDA])
+  
 
 
   const handleInit = async () => {
@@ -77,7 +177,7 @@ export const Reimbursement = () => {
       }));
     signers.push(newAccount);
 
-    const GROUP_NUM = 1
+  
     const result = await mangoV3ReimbursementClient.program.account.group.all()
     console.log('result ::: ', result)
     const group = result.find((group) => group.account.groupNum === GROUP_NUM);
@@ -281,11 +381,30 @@ export const Reimbursement = () => {
             return (<option key={fund.fundPDA} value={fund.fundPDA}>{fund.fundPDA}</option>)
           })
         }
-      </select>
+      </select>        
       <button onClick={handleInit}>Init </button>
       <button onClick={handleReimburse}>Reimburse </button>
 
       <button onClick={handleFunds}>Load Funds</button>
+      <table>
+            <tbody>
+              <tr>
+                <th>Amount</th>
+                <th>mint</th>
+                <th>tableIndex</th>
+              </tr>
+              {
+                claimTokensTable.length && claimTokensTable.map(t => <>
+                <tr>
+                <td>{t.nativeAmount.toNumber()}</td>
+                <td>{t.mintPubKey.toBase58()}</td>
+                <td>{t.tableIndex}</td>
+                <td>{t.index}</td>
+              </tr>
+                </>)
+              }
+            </tbody>
+          </table>
     </div>
   )
 }
