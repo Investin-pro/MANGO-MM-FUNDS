@@ -62,20 +62,20 @@ function App() {
         {/* {
           transactions && <TransactionsView transactions={transactions} />
         } */}
-        <InitialisedFund />
+        {/* <InitialisedFund /> */}
         <Reimbursement/>
-        <Deposit />
+        {/* <Deposit /> */}
         <Withdraw />
-        <ProcessDeposits />
-        <ProcessWithdraws />
-        <Settlement />
-        <InitForceSettle />
-        <ForceProcessWithdraws/>
+        {/* <ProcessDeposits /> */}
+        {/* <ProcessWithdraws /> */}
+        {/* <Settlement /> */}
+        {/* <InitForceSettle /> */}
+        {/* <ForceProcessWithdraws/> */}
         {/* <FakeInvestorDeposit/> */}
         {/* <Claim /> */}
-        <ForceUpdatePerp/>
+        {/* <ForceUpdatePerp/> */}
         <AllFundsInvestors/>
-        <DisplayInfo/>
+        {/* <DisplayInfo/> */}
       </Container>
     </div>
   );
