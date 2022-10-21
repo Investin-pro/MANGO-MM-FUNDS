@@ -90,7 +90,10 @@ pub struct FundData {
     pub lockup_amount: I80F48,
     
     
-    pub padding: [u8; 144]
+    pub reimbursement_vault: Pubkey,
+    
+    
+    pub padding: [u8; 112]
 
 
 }

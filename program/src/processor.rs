@@ -246,6 +246,19 @@ impl Fund {
         Ok(())
     }
 
+    pub fn mango_reimburse(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        token_index: usize,
+        index_into_table: usize,
+        transfer_claim: bool,
+    ) -> Result<(), ProgramError> {
+        
+        
+        
+        Ok(())
+    }
+
     // investor deposit
     pub fn investor_deposit(
         program_id: &Pubkey,

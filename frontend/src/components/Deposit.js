@@ -120,7 +120,7 @@ export const Deposit = () => {
       let manager = fundData[i].manager_account;
       let PDA = await PublicKey.findProgramAddress([manager.toBuffer()], programId);
       let fundState = await PublicKey.createWithSeed(manager, FUND_ACCOUNT_KEY, programId);
-      console.log(`PDA[0]`, PDA)
+      // console.log(`PDA[0]`, PDA)
       managers.push({
         fundPDA: PDA[0].toBase58(),
         fundManager: manager.toBase58(),

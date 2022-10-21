@@ -4,6 +4,8 @@
   "private": true,
   "dependencies": {
     "@blockworks-foundation/mango-client": "=3.2.7",
+    "@blockworks-foundation/mango-v3-reimbursement-lib": "^1.0.8",
+    "@project-serum/anchor": "^0.25.0",
     "@project-serum/borsh": "^0.2.2",
     "@project-serum/serum": "^0.13.37",
     "@project-serum/sol-wallet-adapter": "^0.2.0",

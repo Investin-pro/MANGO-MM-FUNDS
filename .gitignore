@@ -1,4 +1,4 @@
-**/node_modules
+**/node_modules/**
 *.sw[po]
 *.lock
 /.cargo
@@ -14,10 +14,12 @@ program-mm/Cargo.lock
 program-fund/target
 program-fund/Cargo.lock
 package-lock.json
-frontend/node_modules
+frontend/node_modules/** 
 
 
 # Added by cargo
 
 /target
 program-fund/target/.rustc_info.json
+.gitignore
+frontend/node_modules/@project-serum/anchor/jest.config.js
