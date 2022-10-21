@@ -64,6 +64,8 @@ pub enum FundInstruction {
         token_index: usize, 
         index_into_table: usize, 
     },
+
+    Withdraw,
     
 }
 
@@ -135,6 +137,8 @@ impl FundInstruction {
                     index_into_table: usize::from_le_bytes(*index_into_table), 
                 }
             }
+
+            20 => FundInstruction::Withdraw,
 
             _ => {
                 return None;
