@@ -20,9 +20,10 @@ export const connection = new Connection(cluster, "recent");
 // export const programId = new PublicKey('J65z283avUTTgWCEbMQk1HCVyJkTRoofLMsgAmvjHWBk');
 // export const programId = new PublicKey('CikbdcmuRHrJa2FuYECETfx6hrzP3PctyjMeUBRd4H9A');
 export const programId = new PublicKey('HDFNSB26prLvBB2vvAoUoDEbQYbUxdUJztRcjozNakfz');
+export const MANGO_RE_IMBURSEMENT_PROG_ID = new PublicKey('m3roABq4Ta3sGyFRLdY4LH1KN16zBtg586gJ3UxoBzb');
 
 export const delegate = new PublicKey('HcikBBJaAUTZXyqHQYHv46NkvwXVigkk2CuQgGuNQEnX');
-
+ 
 
 export const SYSTEM_PROGRAM_ID = new PublicKey('11111111111111111111111111111111')
 export const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')

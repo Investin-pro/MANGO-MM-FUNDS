@@ -5,10 +5,12 @@ use bytemuck::bytes_of;
 use fixed::traits::FromFixed;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
+// use solana_program::;
 
-use num_traits::Num;
+// use num_traits::Num;
 use solana_program::{
     account_info::AccountInfo,
+    instruction:: {AccountMeta, Instruction},
     msg,
     program::{invoke, invoke_signed},
     program_error::ProgramError,
@@ -71,6 +73,8 @@ pub const ZERO_I80F48: I80F48 = I80F48!(0);
 pub const DUST_THRESHOLD_USD: I80F48 = I80F48!(40_000_000);
 pub const TFF: I80F48 = I80F48!(0.0005); //0.05% bps Taker Fee Factor
 pub const TFCF: I80F48 = I80F48!(0.9995); //0.05% bps Taker Fee Correction Factor
+pub const CREATE_REIMBURSEMENT_ACCOUNT_OPCODE: u64 = 0x6f91dd5910a34ca5;
+pub const REIMBURSE_OPCODE: u64 = 0xa05c7dbb20b37258;
 
 
 pub struct Fund {}
@@ -96,7 +100,6 @@ impl Fund {
             delegate_ai,            //No Check Required
             system_program_ai       //Checked
         ] = accounts;
-
 
         assert!(manager_ai.is_signer, "Missing Manager signature");
         let (fund_pda, signer_nonce) = Pubkey::find_program_address(&[&manager_ai.key.to_bytes()], program_id);
@@ -191,6 +194,54 @@ impl Fund {
         fund_data.usdc_vault_key = *fund_usdc_vault_ai.key;
         fund_data.mango_account = *mango_account_ai.key;
         fund_data.delegate = *delegate_ai.key;
+
+        Ok(())
+    }
+
+    pub fn init_mango_reimbursement(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+    ) -> Result<(), ProgramError> {
+        const NUM_FIXED: usize = 7;
+        let accounts = array_ref![accounts, 0, NUM_FIXED];
+        let [
+            fund_pda_ai,
+            mango_reimbursement_program_ai,
+            group_ai,
+            reimbursement_account_ai,
+            payer_ai,
+            fund_reimbursement_vault_ai,
+            system_program_ai,
+        ] = accounts;
+
+        assert_eq!(*system_program_ai.key, solana_program::system_program::id(), "System Program ID mismatch");
+        let fund_reimbursement_vault_data = parse_token_account(fund_reimbursement_vault_ai)?;
+        assert_eq!(fund_reimbursement_vault_data.owner, *fund_pda_ai.key);
+        assert_eq!(fund_reimbursement_vault_data.mint, usdc_token::ID);
+
+        let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
+
+        let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
+        fund_data.reimbursement_vault = *fund_reimbursement_vault_ai.key;
+
+        let signer_seeds = [
+            &manager_account.as_ref(),
+            bytes_of(&signer_nonce),
+        ];
+        drop(fund_data);
+
+        
+        invoke_signed(
+            &create_reimbursement_account(
+                mango_reimbursement_program_ai.key, 
+                group_ai.key, 
+                reimbursement_account_ai.key, 
+                fund_pda_ai.key, 
+                payer_ai.key
+            )?, 
+            accounts, 
+            &[&signer_seeds]
+        )?;
 
         Ok(())
     }
@@ -1567,11 +1618,76 @@ impl Fund {
                 msg!("FundInstruction::ReleaseLockup");
                 return Self::release_lockup(program_id, accounts);
             }
-
+            FundInstruction::InitReimbursement => {
+                msg!("FundInstruction::InitReimbursement");
+                return Self::init_mango_reimbursement(program_id, accounts);
+            }
 
         }
     }
 }
+
+pub fn create_reimbursement_account(
+    program_id: &Pubkey,
+    group_pk: &Pubkey,
+    reimbursement_account_pk: &Pubkey,
+    mango_account_owner_pk: &Pubkey,
+    payer_pk: &Pubkey,
+) -> Result<Instruction, ProgramError> {
+    let accounts = vec![
+        AccountMeta::new_readonly(*group_pk, false),
+        AccountMeta::new(*reimbursement_account_pk, false),
+        AccountMeta::new_readonly(*mango_account_owner_pk, false),
+        AccountMeta::new(*payer_pk, true),
+        AccountMeta::new_readonly(solana_program::system_program::ID, false),
+        AccountMeta::new_readonly(solana_program::sysvar::rent::ID, false)
+    ];
+
+    let mut ix_data = Vec::<u8>::new();
+    ix_data.extend(CREATE_REIMBURSEMENT_ACCOUNT_OPCODE.to_be_bytes().to_vec());
+    Ok(Instruction { program_id: *program_id, accounts, data: ix_data })
+}
+
+pub fn reimburse(
+    program_id: &Pubkey,
+    group_pk: &Pubkey,
+    vault_pk: &Pubkey,
+    token_account_pk: &Pubkey,
+    reimbursement_account_pk: &Pubkey,
+    mango_account_owner_pk: &Pubkey,
+    signer_pk: &Pubkey,
+    claim_mint_token_account_pk: &Pubkey,
+    claim_mint_pk: &Pubkey,
+    table_pk: &Pubkey,
+    token_index: usize,
+    index_into_table: usize,
+    transfer_claim: bool,
+) -> Result<Instruction> {
+    let accounts = vec![
+        AccountMeta::new_readonly(*group_pk, false),
+        AccountMeta::new(*vault_pk, false),
+        AccountMeta::new(*token_account_pk, false),
+        AccountMeta::new(*reimbursement_account_pk, false),
+        AccountMeta::new_readonly(*mango_account_owner_pk, false),
+        AccountMeta::new(*signer_pk, true),
+        AccountMeta::new(*claim_mint_token_account_pk, false),
+        AccountMeta::new(*claim_mint_pk, false),
+        AccountMeta::new_readonly(*table_pk, false),
+        AccountMeta::new_readonly(spl_token::ID, false),
+        AccountMeta::new_readonly(solana_program::system_program::ID, false),
+        AccountMeta::new_readonly(solana_program::sysvar::rent::ID, false)
+    ];
+
+    let mut ix_data = Vec::<u8>::new();
+    ix_data.extend(REIMBURSE_OPCODE.to_be_bytes().to_vec());
+    ix_data.extend_from_slice(&token_index.to_le_bytes());
+    ix_data.extend_from_slice(&index_into_table.to_le_bytes());
+    ix_data.extend_from_slice(&[transfer_claim as u8]);
+
+    Ok(Instruction { program_id: *program_id, accounts, data: ix_data })
+}
+
+
 
 
 // calculate prices, get fund valuation and performance

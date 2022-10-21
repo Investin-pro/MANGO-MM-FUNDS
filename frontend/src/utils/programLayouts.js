@@ -109,7 +109,10 @@ export const FUND_DATA = struct([
 
   ]), 1, 'forceSettleData'),
   I80F48('lockup'),
-  seq(u8('padding'), 144, 'padding'),
+
+  publicKeyLayout('reimbursement_vault_key'), // 32
+
+  seq(u8('padding'), 112, 'padding'),
 
 
 ])

@@ -56,7 +56,11 @@ pub enum FundInstruction {
 
     ForceWithdraws, 
 
-    ResetMangoDelegate
+    ResetMangoDelegate,
+
+    InitReimbursement,
+
+    // Reimburse,
     
 }
 
@@ -116,6 +120,10 @@ impl FundInstruction {
             16 => FundInstruction::ReleaseLockup,
 
             17 => FundInstruction::InvestorCancelWithdrawRequest,
+
+            18 => FundInstruction::InitReimbursement,
+            
+            // 19 => FundInstruction::Reimburse,
 
             _ => {
                 return None;
