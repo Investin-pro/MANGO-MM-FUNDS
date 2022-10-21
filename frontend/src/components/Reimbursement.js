@@ -1,4 +1,4 @@
-import { PublicKey, Transaction, TransactionInstruction, create, Account, SystemProgram} from '@solana/web3.js';
+import { PublicKey, Transaction, TransactionInstruction, create, Account, SystemProgram, Keypair, SYSVAR_RENT_PUBKEY} from '@solana/web3.js';
 import React, { useState } from 'react'
 import { GlobalState } from '../store/globalState';
 import { connection, programId, platformStateAccount, FUND_ACCOUNT_KEY, TOKEN_PROGRAM_ID, MANGO_RE_IMBURSEMENT_PROG_ID, SYSTEM_PROGRAM_ID } from '../utils/constants';
@@ -59,26 +59,27 @@ export const Reimbursement = () => {
     const newAccount = new Account()
     const USDCReimburseVaultTokenAccount = newAccount.publicKey;
     console.log("USDCReimburseVaultTokenAccount:",USDCReimburseVaultTokenAccount.toBase58())
-
-    // transaction.add(
-    //   SystemProgram.createAccount({
-    //     fromPubkey: key,
-    //     newAccountPubkey: USDCReimburseVaultTokenAccount,
-    //     lamports: (await connection.getMinimumBalanceForRentExemption(390)),
-    //     space: 390,
-    //     programId : TOKEN_PROGRAM_ID
-    //   })
-    // )
-    // transaction.add(
-    //     initializeAccount({
-    //     account: USDCReimburseVaultTokenAccount,
-    //     mint: new PublicKey(ids.tokens[0].mintKey),
-    //     owner : new PublicKey(fundPDA)
-    //   }));
-    // signers.push(newAccount);
+      const somelaps = (await connection.getMinimumBalanceForRentExemption(390));
+    transaction.add(
+      SystemProgram.createAccount({
+        fromPubkey: key,
+        newAccountPubkey: USDCReimburseVaultTokenAccount,
+        lamports: somelaps ,
+        space: 165,
+        programId : TOKEN_PROGRAM_ID
+      })
+    )
+    transaction.add(
+        initializeAccount({
+        account: USDCReimburseVaultTokenAccount,
+        mint: new PublicKey(ids.tokens[0].mintKey),
+        owner : new PublicKey(fundPDA)
+      }));
+    signers.push(newAccount);
 
     const GROUP_NUM = 1
     const result = await mangoV3ReimbursementClient.program.account.group.all()
+    console.log('result ::: ', result)
     const group = result.find((group) => group.account.groupNum === GROUP_NUM);
     console.log("group:",group.publicKey.toBase58())
 
@@ -94,8 +95,6 @@ export const Reimbursement = () => {
     )[0]
     console.log("reimbursementAccount:",reimbursementAccount.toBase58())
 
-
-
     const dataLayout = struct([u32('instruction')])
     const data = Buffer.alloc(dataLayout.span)
     dataLayout.encode(
@@ -107,13 +106,14 @@ export const Reimbursement = () => {
     const keys =  [
       { pubkey: new PublicKey(fundPDA), isSigner: false, isWritable: true }, //fund State Account
       { pubkey: MANGO_RE_IMBURSEMENT_PROG_ID, isSigner: false, isWritable: false },
-      { pubkey: group.publicKey, isSigner: true, isWritable: true },
+      { pubkey: group.publicKey, isSigner: false, isWritable: true },
       
       { pubkey: reimbursementAccount, isSigner: false, isWritable: true },
 
       { pubkey: key, isSigner: true, isWritable: true },
       { pubkey: USDCReimburseVaultTokenAccount, isSigner: false, isWritable: true }, // Investor Base Token Account
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false }
+      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
     ];
 
     for(let i = 0; i<keys.length; i++){
@@ -131,8 +131,8 @@ export const Reimbursement = () => {
     let hash = await connection.getRecentBlockhash();
     transaction.recentBlockhash = hash.blockhash;
     console.log("tx", transaction);
-    // transaction.setSigners(key);
-    // transaction.partialSign(...signers)
+    console.log('signers :>> ', signers);
+    transaction.partialSign(...signers)
 
     const sign = await signAndSendTransaction(walletProvider, transaction);
     console.log("signature tx:: ", sign)
@@ -269,13 +269,13 @@ export const Reimbursement = () => {
 
   return (
     <div className="form-div">
-      {/* <h4>Investor Reimbursement</h4>
-      amount ::: {' '}
+       <h4>Investor Reimbursement</h4>
+      {/*amount ::: {' '}
       <input type="number" value={amount} onChange={(event) => setAmount(event.target.value)} /> */}
       <br />
       <label htmlFor="funds">Select Fund Address:</label>
 
-      <select name="funds" width = "100px" onClick={handleFundSelect}>
+      <select name="funds" width = "100px" onChange={handleFundSelect}>
         {
           funds.map((fund) => {
             return (<option key={fund.fundPDA} value={fund.fundPDA}>{fund.fundPDA}</option>)

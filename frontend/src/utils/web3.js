@@ -157,7 +157,7 @@ export async function createTokenAccountIfNotExist(
       owner,
       TOKEN_PROGRAM_ID,
       lamports,
-      390,
+      165,
       transaction,
       signer
     )
