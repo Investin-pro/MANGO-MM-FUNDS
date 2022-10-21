@@ -202,7 +202,7 @@ impl Fund {
         program_id: &Pubkey,
         accounts: &[AccountInfo],
     ) -> Result<(), ProgramError> {
-        const NUM_FIXED: usize = 7;
+        const NUM_FIXED: usize = 8;
         let accounts = array_ref![accounts, 0, NUM_FIXED];
         let [
             fund_pda_ai,
@@ -212,6 +212,7 @@ impl Fund {
             payer_ai,
             fund_reimbursement_vault_ai,
             system_program_ai,
+            sysvar_rent_ai,
         ] = accounts;
 
         assert_eq!(*system_program_ai.key, solana_program::system_program::id(), "System Program ID mismatch");
@@ -246,16 +247,67 @@ impl Fund {
         Ok(())
     }
 
-    pub fn mango_reimburse(
+    pub fn mango_reimbursement(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
-        token_index: usize,
-        index_into_table: usize,
-        transfer_claim: bool,
+        token_index: usize, 
+        index_into_table: usize, 
     ) -> Result<(), ProgramError> {
+        const NUM_FIXED: usize = 12;
+        let accounts = array_ref![accounts, 0, NUM_FIXED];
+        let [
+            fund_pda_ai,
+            mango_reimbursement_program_ai,
+            group_ai, 
+            vault_ai, 
+            fund_reimbursement_vault_ai, 
+            reimbursement_account_ai, 
+            claim_mint_token_account_ai, 
+            claim_mint_ai, 
+            table_ai,
+            token_program_ai,
+            system_program_ai,
+            sysvar_rent_ai,
+        ] = accounts;
+
+        assert_eq!(*system_program_ai.key, solana_program::system_program::id(), "System Program ID mismatch");
+        assert_eq!(*token_program_ai.key, spl_token::id(), "Token Program ID mismatch");
+        let fund_reimbursement_vault_data = parse_token_account(fund_reimbursement_vault_ai)?;
+        assert_eq!(fund_reimbursement_vault_data.owner, *fund_pda_ai.key);
+        assert_eq!(fund_reimbursement_vault_data.mint, usdc_token::ID);
+
+        let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
+        assert_eq!(*fund_reimbursement_vault_ai.key, fund_data.reimbursement_vault);
+        let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
+        fund_data.reimbursement_vault = *fund_reimbursement_vault_ai.key;
+
+        let signer_seeds = [
+            &manager_account.as_ref(),
+            bytes_of(&signer_nonce),
+        ];
+        drop(fund_data);
+
         
-        
-        
+        invoke_signed(
+            &reimburse(
+                mango_reimbursement_program_ai.key, 
+                group_ai.key, 
+                vault_ai.key, 
+                fund_reimbursement_vault_ai.key, 
+                reimbursement_account_ai.key, 
+                fund_pda_ai.key, 
+                fund_pda_ai.key, 
+                claim_mint_token_account_ai.key, 
+                claim_mint_ai.key, 
+                table_ai.key, 
+                token_index, 
+                index_into_table, 
+                true
+            )?,
+            accounts, 
+            &[&signer_seeds]
+        )?;
+
         Ok(())
     }
 
@@ -1635,6 +1687,10 @@ impl Fund {
                 msg!("FundInstruction::InitReimbursement");
                 return Self::init_mango_reimbursement(program_id, accounts);
             }
+            FundInstruction::Reimburse {token_index, index_into_table} => {
+                msg!("FundInstruction::Reimburse");
+                return Self::mango_reimbursement(program_id, accounts, token_index, index_into_table);
+            }
 
         }
     }
@@ -1675,7 +1731,7 @@ pub fn reimburse(
     token_index: usize,
     index_into_table: usize,
     transfer_claim: bool,
-) -> Result<Instruction> {
+) -> Result<Instruction, ProgramError> {
     let accounts = vec![
         AccountMeta::new_readonly(*group_pk, false),
         AccountMeta::new(*vault_pk, false),

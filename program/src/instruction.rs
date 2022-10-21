@@ -60,7 +60,10 @@ pub enum FundInstruction {
 
     InitReimbursement,
 
-    // Reimburse,
+    Reimburse{
+        token_index: usize, 
+        index_into_table: usize, 
+    },
     
 }
 
@@ -123,7 +126,15 @@ impl FundInstruction {
 
             18 => FundInstruction::InitReimbursement,
             
-            // 19 => FundInstruction::Reimburse,
+            19 => {
+                let data = array_ref![data, 0, 8 + 8 ];
+                let (token_index, index_into_table) = array_refs![data, 8, 8];
+
+                FundInstruction::Reimburse { 
+                    token_index: usize::from_le_bytes(*token_index), 
+                    index_into_table: usize::from_le_bytes(*index_into_table), 
+                }
+            }
 
             _ => {
                 return None;
