@@ -19,7 +19,7 @@ import { Settlement } from './components/Settlement';
 import { InitForceSettle } from './components/InitForceSettle';
 import { ForceUpdatePerp } from './components/ForceUpdatePerp';
 import { ForceProcessWithdraws } from './components/ForceProcessWithdraws';
-import { FakeInvestorDeposit } from './components/FakeInvestorDeposit';
+// import { FakeInvestorDeposit } from './components/FakeInvestorDeposit';
 
 function App() {
   const walletProvider = GlobalState.useState(s => s.walletProvider);
@@ -68,7 +68,7 @@ function App() {
         <Settlement />
         <InitForceSettle />
         <ForceProcessWithdraws/>
-        <FakeInvestorDeposit/>
+        {/* <FakeInvestorDeposit/> */}
         {/* <Claim /> */}
         <ForceUpdatePerp/>
         <AllFundsInvestors/>
