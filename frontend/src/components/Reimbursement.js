@@ -373,6 +373,7 @@ export const Reimbursement = () => {
   const handleFundSelect = async(event) => {
   
     setFundPDA(event.target.value);
+    console.log(`setting fundPDA :::: `,event.target.value, fundPDA)
     console.log(`setting fundPDA :::: `,event.target.value);
     console.log(`setting fundPDA :::: `,fundPDA);
     
@@ -415,7 +416,6 @@ export const Reimbursement = () => {
       <button onClick={handleReimburse}>Reimburse </button>
 
       <button onClick={handleFunds}>Load Funds</button>
-<<<<<<< HEAD
       <table>
             <tbody>
               <tr>
@@ -436,15 +436,13 @@ export const Reimbursement = () => {
               }
             </tbody>
           </table>
-=======
+
       <br /><br /><br />
 
       <b>Vault : {vault} </b>
       <br />
 
       <b>balance USDC : {USDCBAL} </b>
-
->>>>>>> 30cf7891581f045f4745bf2f6f29c7a495ad52c5
     </div>
   )
 }
