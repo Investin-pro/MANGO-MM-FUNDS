@@ -31,7 +31,7 @@ export const doSomething = async ({connection, transaction, wallet, enableSignin
 }
 
 export const sendRawTransaction = async ({ connection, txid, rawTransaction }, confirmLevel="confirmed") => {
-  const timeout = 120000;
+  const timeout = 60000;
   const startTime = getUnixTs();
   let done = false;
   (async () => {

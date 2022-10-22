@@ -5,13 +5,14 @@ import { connection, programId, platformStateAccount, FUND_ACCOUNT_KEY, TOKEN_PR
 import { nu64, struct, u32 } from 'buffer-layout';
 import { createKeyIfNotExists, findAssociatedTokenAddress, signAndSendTransaction, createAssociatedTokenAccountIfNotExist, createAccountInstruction } from '../utils/web3';
 import { FUND_DATA, INVESTOR_DATA } from '../utils/programLayouts';
-import { awaitTransactionSignatureConfirmation, IDS, MangoClient } from '@blockworks-foundation/mango-client';
+import { awaitTransactionSignatureConfirmation, IDS, MangoClient, u64 } from '@blockworks-foundation/mango-client';
 import { sendSignedTransactionAndNotify } from '../utils/solanaWeb3';
 import { MangoV3ReimbursementClient } from "@blockworks-foundation/mango-v3-reimbursement-lib/dist";
 import { AnchorProvider } from "@project-serum/anchor";
 import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet";
 import { initializeAccount } from '@project-serum/serum/lib/token-instructions';
 import { Config } from "@blockworks-foundation/mango-client";
+import { Table } from 'reactstrap';
 
 const GROUP_NUM = 1
 
@@ -31,7 +32,10 @@ export const Reimbursement = () => {
   const [fundPDA, setFundPDA] = useState('');
   const [funds, setFunds] = useState([]);
   const [claimTokensTable, setClaimTokensTable] = useState([]);
+  const [table, setTable] = useState([])
   const [tableIndex, setTableIndex] = useState(0);
+  const [row, setRow] = useState({})
+  const [mangoV3ReimbursementClient, setMangoV3ReimbursementClient] = useState({})
 
   const [vault, setVault] = useState('11111111111111111');
   const [USDCBAL, setUSDCBAL] = useState(-1)
@@ -40,10 +44,11 @@ export const Reimbursement = () => {
   const walletProvider = GlobalState.useState(s => s.walletProvider);
   const ids = IDS['groups'][0]
 
-  const doSomething = async () => {
+  const fetchTable = async () => {
+
+    console.log("----------fetchTable")
     const key = walletProvider?.publicKey;
 
-    if(fundPDA === '') return
 
     if (!key) {
       alert("connect wallet")
@@ -64,17 +69,45 @@ export const Reimbursement = () => {
     const group = result.find((group) => group.account.groupNum === GROUP_NUM);
     console.log("group:",group.publicKey.toBase58())
 
-    const config = Config.ids();
-    const groupIds = IDS.groups.find(f => f.name === 'mainnet.1');
-    console.log('groupIds :: ', groupIds)
-    console.log('config :>> ', config);
+    // const config = Config.ids();
+    // const groupIds = IDS.groups.find(f => f.name === 'mainnet.1');
+    // console.log('groupIds :: ', groupIds)
+    // console.log('config :>> ', config);
+
+      setMangoV3ReimbursementClient(mangoV3ReimbursementClient);
+
+
+
     const table = await tryDecodeTable(mangoV3ReimbursementClient, group);
-    const tableIndex = table.findIndex((row) =>
-    row.owner.equals(new PublicKey(fundPDA))
-  )
+    console.log('table :>> ', table);
+    setTable(table);
+  }
+
+  const fetchTableIndexForFund = async () => {
+
+    console.log("----------fetchTableIndexForFund")
+
+    const key = walletProvider?.publicKey;
+
+    if(fundPDA === '') return
+
+    if (!key) {
+      alert("connect wallet")
+      return;
+    };
+
+    const tableIndex = table.findIndex((row) => row.owner.equals(new PublicKey(fundPDA)))
     setTableIndex(tableIndex)
     console.log('table :>> ', table);
 
+    const result = await mangoV3ReimbursementClient.program.account.group.all()
+    console.log('result ::: ', result)
+    const group = result.find((group) => group.account.groupNum === GROUP_NUM);
+    console.log("group:",group.publicKey.toBase58())
+
+    const config = Config.ids();
+    const groupIds = IDS.groups.find(f => f.name === 'mainnet.1');
+    
     const balancesForUser = table.find((row) =>
         row.owner.equals(new PublicKey(fundPDA))
       )?.balances;
@@ -120,26 +153,23 @@ export const Reimbursement = () => {
         setClaimTokensTable([])
         console.error("errrrr>>>>>")
       }
+
   }
 
   // useEffect(() => {
-  //   doSomething()
-  // }, [fundPDA])
+  //   fetchTable()
+  // }, [walletProvider])
   
 
 
   const handleInit = async () => {
 
     try {
-      
-   
     const key = walletProvider?.publicKey;
-
     if (!key) {
       alert("connect wallet")
       return;
     };
-
     // MangoV3ReimbursementClient
     const options = AnchorProvider.defaultOptions();
     const provider = new AnchorProvider(
@@ -158,11 +188,6 @@ export const Reimbursement = () => {
 
     const transaction = new Transaction();
   
-    // const openOrdersLamports = await connection.getMinimumBalanceForRentExemption(
-    //       INVESTOR_DATA.span,
-    //       'singleGossip'
-    //     )
-    // const investerStateAccount = await createAccountInstruction(connection, key, INVESTOR_DATA.span, programId, openOrdersLamports, transaction, signers);
     let signers = [];
     const newAccount = new Account()
     const USDCReimburseVaultTokenAccount = newAccount.publicKey;
@@ -242,22 +267,22 @@ export const Reimbursement = () => {
     console.log('signers :>> ', signers);
     transaction.partialSign(...signers)
 
-    const sign = await signAndSendTransaction(walletProvider, transaction);
-    console.log("signature tx:: ", sign)
-    await awaitTransactionSignatureConfirmation(sign, 120000, connection, 'finalized')
+    // const sign = await signAndSendTransaction(walletProvider, transaction);
+    // console.log("signature tx:: ", sign)
+    // await awaitTransactionSignatureConfirmation(sign, 120000, connection, 'finalized')
    
 
-      // try {
-      //     await sendSignedTransactionAndNotify({
-      //         connection,
-      //         transaction: transaction,
-      //         successMessage: "Investment successful",
-      //         failMessage: "Investment unsuccessful",
-      //         wallet: walletProvider
-      //     })
-      // } catch (error) {
-      //     console.error('handleMakeInvestment: ', error);
-      // }
+      try {
+          await sendSignedTransactionAndNotify({
+              connection,
+              transaction: transaction,
+              successMessage: "Investment successful",
+              failMessage: "Investment unsuccessful",
+              wallet: walletProvider
+          })
+      } catch (error) {
+          console.error('handleMakeInvestment: ', error);
+      }
 
     } catch (error) {
       console.log("errorLLL::",error);
@@ -266,6 +291,7 @@ export const Reimbursement = () => {
 
   const handleReimburse = async () => {
 
+    console.log("handleReimburse-------");
     const key = walletProvider?.publicKey;
 
     if (!key) {
@@ -284,7 +310,6 @@ export const Reimbursement = () => {
 
 
     console.log('selected FundPDA::', fundPDA)
-  
     let fundStateInfo = await connection.getAccountInfo(new PublicKey(fundPDA))
     let fundState = FUND_DATA.decode(fundStateInfo.data)
     console.log("fundState:: ", fundState)
@@ -292,7 +317,6 @@ export const Reimbursement = () => {
     const transaction = new Transaction();
 
     const USDCReimburseVaultTokenAccount = fundState.reimbursement_vault_key;
-
     const result = await mangoV3ReimbursementClient.program.account.group.all()
     console.log('result ::: ', result)
     const group = result.find((group) => group.account.groupNum === GROUP_NUM);
@@ -309,11 +333,14 @@ export const Reimbursement = () => {
     )[0]
     console.log("reimbursementAccount:",reimbursementAccount.toBase58())
 
-    const dataLayout = struct([u32('instruction')])
+    console.log("tableIndex----:",tableIndex)
+    const dataLayout = struct([u32('instruction'),nu64('tokenIndex'),nu64('tableIndex')])
     const data = Buffer.alloc(dataLayout.span)
     dataLayout.encode(
       {
         instruction: 19,
+        tokenIndex : 15,
+        tableIndex : tableIndex,
       },
       data
     )
@@ -321,11 +348,14 @@ export const Reimbursement = () => {
       { pubkey: new PublicKey(fundPDA), isSigner: false, isWritable: true }, //fund State Account
       { pubkey: MANGO_RE_IMBURSEMENT_PROG_ID, isSigner: false, isWritable: false },
       { pubkey: group.publicKey, isSigner: false, isWritable: true },
-      
-      { pubkey: reimbursementAccount, isSigner: false, isWritable: true },
-
-      { pubkey: key, isSigner: true, isWritable: true },
+      { pubkey: new PublicKey('2c9x2g7VUwCd9ppHDV6LxJ1YDb1799MXwvp9SKJe8YXm'), isSigner: false, isWritable: true },
       { pubkey: USDCReimburseVaultTokenAccount, isSigner: false, isWritable: true }, // Investor Base Token Account
+      { pubkey: new PublicKey('4ZNm6giak4pBL9vo5cnGpYDm8MzPwE5fAdaWpAp2boHW'), isSigner: false, isWritable: true },
+      { pubkey: new PublicKey(ids.tokens[0].mintKey), isSigner: false, isWritable: true },
+      { pubkey: group?.account.table, isSigner: false, isWritable: true },
+
+      // { pubkey: key, isSigner: true, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: true },
       { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
     ];
@@ -345,72 +375,6 @@ export const Reimbursement = () => {
     let hash = await connection.getRecentBlockhash();
     transaction.recentBlockhash = hash.blockhash;
     console.log("tx", transaction);
-    console.log('signers :>> ', signers);
-
-
-    // console.log("JILELE: ", row.tableIndex)
-
-    // console.log('selected FundPDA::', fundPDA)
-  
-    // let fundStateInfo = await connection.getAccountInfo(new PublicKey(fundPDA))
-    // let fundState = FUND_DATA.decode(fundStateInfo.data)
-    // console.log("fundState:: ", fundState)
-
-    // const transaction = new Transaction()
-  
-    // const openOrdersLamports = await connection.getMinimumBalanceForRentExemption(
-    //       INVESTOR_DATA.span,
-    //       'singleGossip'
-    //     )
-    // let signers = [];
-    
-    // const investerStateAccount = await createAccountInstruction(connection, key, INVESTOR_DATA.span, programId, openOrdersLamports, transaction, signers);
-    // const investorBaseTokenAccount = await createAssociatedTokenAccountIfNotExist(walletProvider, new PublicKey(ids.tokens[0].mintKey), key, transaction);
-
-    // console.log("account size::: ", INVESTOR_DATA.span)
-
-    // const dataLayout = struct([u32('instruction'), nu64('amount')])
-    // const data = Buffer.alloc(dataLayout.span)
-    // dataLayout.encode(
-    //   {
-    //     instruction: 1,
-    //     amount: amount * ( 10 ** ids.tokens[0].decimals)
-    //   },
-    //   data
-    // )
-    // const keys =  [
-    //   { pubkey: new PublicKey(fundPDA), isSigner: false, isWritable: true }, //fund State Account
-    //   { pubkey: investerStateAccount, isSigner: false, isWritable: true },
-    //   { pubkey: key, isSigner: true, isWritable: true },
-    //   { pubkey: investorBaseTokenAccount, isSigner: false, isWritable: true }, // Investor Base Token Account
-    //   { pubkey: fundState.usdc_vault_key, isSigner: false, isWritable: true },
-    //   { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }
-    // ];
-
-    // for(let i = 0; i<keys.length; i++){
-    //   console.log('>>',i, keys[i].pubkey.toBase58())
-    // }
-
-
-    // const instruction = new TransactionInstruction({
-    //   keys,
-    //   programId,
-    //   data
-    // });
-
-   
-    // transaction.add(instruction)
-    // transaction.feePayer = walletProvider?.publicKey;
-    // let hash = await connection.getRecentBlockhash();
-    // console.log("tx", transaction);
-    // transaction.recentBlockhash = hash.blockhash;
-    // // transaction.setSigners(key);
-    // transaction.partialSign(...signers)
-
-    // const sign = await signAndSendTransaction(walletProvider, transaction);
-    // console.log("signature tx:: ", sign)
-    // await awaitTransactionSignatureConfirmation(sign, 120000, connection, 'finalized')
-   
 
       try {
           await sendSignedTransactionAndNotify({
@@ -474,7 +438,6 @@ export const Reimbursement = () => {
       const USDCBalance = walletBalance.value.uiAmountString;
       setUSDCBAL(USDCBalance);
     }
-    await doSomething()
   }
 
   return (
@@ -491,12 +454,25 @@ export const Reimbursement = () => {
             return (<option key={fund.fundPDA} value={fund.fundPDA}>{fund.fundPDA}</option>)
           })
         }
-      </select>        
+      </select>    
+      <br /><br />    
       <button onClick={handleInit}>Init </button>
       <button onClick={handleReimburse}>Reimburse </button>
+      <br />
+      <b>Selected TableIndex  : {tableIndex} </b><br />
 
+      <br /><br />
       <button onClick={handleFunds}>Load Funds</button>
-      <table>
+      <button onClick={fetchTable}>Fetch Table</button>
+      <button onClick={fetchTableIndexForFund}>Fetch TableIndex for Fund</button>
+
+      <br /><br />
+
+      <b>Selected Fund  : {fundPDA} </b><br />
+
+      <b>Table Len  : {table.length} </b><br />
+
+      <Table>
             <tbody>
               <tr>
                 <th>Amount</th>
@@ -515,10 +491,10 @@ export const Reimbursement = () => {
                 </>)
               }
             </tbody>
-          </table>
+          </Table>
 
-              selected row : {JSON.stringify(row)}
-      <br /><br /><br />
+              {/* selected row : {JSON.stringify(row)} */}
+      <br />
 
       <b>Vault : {vault} </b>
       <br />
