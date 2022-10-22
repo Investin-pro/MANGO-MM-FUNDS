@@ -55,7 +55,7 @@ export const Withdraw2 = () => {
     const keys =  [
       { pubkey: investmentState.fund, isSigner: false, isWritable: true }, //fund State Account
       { pubkey: fundState.reimbursement_vault_key, isSigner: false, isWritable: true },
-      { pubkey: investmentState.owner, isSigner: true, isWritable: true },
+      { pubkey: investmentState.owner, isSigner: false, isWritable: true },
       { pubkey: new PublicKey(selectedInvestmentStateAcc), isSigner: false, isWritable: true },
       { pubkey: investorBaseTokenAccount, isSigner: false, isWritable: true},
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
@@ -102,17 +102,19 @@ export const Withdraw2 = () => {
     setSelectedInvestmentStateAcc(event.target.value);
     console.log(`setting selectedInvestmentStateAcc :::: `,event.target.value, selectedInvestmentStateAcc)
   }
-  
+
   const handleGetInvestmentsForWithdraw = async () => {
 
-    const investorAccount = walletProvider?.publicKey;
-    console.log("Investor::",investorAccount.toBase58())
+    // const investorAccount = walletProvider?.publicKey;
+    // console.log("Investor::",investorAccount.toBase58())
+
+    const fund_pubkey = new PublicKey('2JJAQ5iiMuXLbLDPh5iEkKYT38RoJDsbN9Yrp3JNt1a6');
 
     let investments = await connection.getProgramAccounts(programId, { 
       filters: [
         {
-          memcmp : { offset : INVESTOR_DATA.offsetOf('owner') , bytes : investorAccount.toString()},
-          memcmp : { offset : INVESTOR_DATA.offsetOf('investment_status') , bytes : bs58.encode((new BN(4, 'le')).toArray())}
+          memcmp : { offset : INVESTOR_DATA.offsetOf('fund') , bytes : fund_pubkey.toString()},
+          // memcmp : { offset : INVESTOR_DATA.offsetOf('fund') , bytes : bs58.encode((new BN(4, 'le')).toArray())}
         },
         { dataSize: INVESTOR_DATA.span }
       ]
