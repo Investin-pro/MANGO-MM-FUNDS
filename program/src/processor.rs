@@ -764,10 +764,11 @@ impl Fund {
 
         let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
         assert_eq!(*fund_reimbursement_vault_ai.key, fund_data.reimbursement_vault, "Vault mismatch");
-
+        let investor_usdc_vault_data = parse_token_account(investor_usdc_vault_ai)?;
+        assert_eq!(*investor_ai.key, investor_usdc_vault_data.owner);
         update_amount_and_performance2(&mut fund_data, fund_reimbursement_vault_ai, true)?;
 
-        // let withdraw_amount = compute_withdraw_amount(program_id, investors_ais, fund_pda_ai, &mut fund_data)?;
+        assert!(investor_ai.is_signer);
         let mut investor_data = InvestorData::load_mut_checked(&investor_state_ai, program_id, fund_pda_ai.key)?;
         assert!(investor_data.investment_status != InvestmentStatus::PendingDeposit && investor_data.investment_status != InvestmentStatus::ReadyToClaim);
         let performance:I80F48 = fund_data.current_index.checked_div(investor_data.start_index).unwrap();
