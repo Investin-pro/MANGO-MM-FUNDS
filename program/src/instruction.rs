@@ -67,6 +67,7 @@ pub enum FundInstruction {
 
     Withdraw,
     
+    ClaimPerformanceFee2,
 }
 
 impl FundInstruction {
@@ -139,6 +140,8 @@ impl FundInstruction {
             }
 
             20 => FundInstruction::Withdraw,
+
+            21 => FundInstruction::ClaimPerformanceFee2,
 
             _ => {
                 return None;

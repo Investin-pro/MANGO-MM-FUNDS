@@ -766,7 +766,7 @@ impl Fund {
         assert_eq!(*fund_reimbursement_vault_ai.key, fund_data.reimbursement_vault, "Vault mismatch");
         let investor_usdc_vault_data = parse_token_account(investor_usdc_vault_ai)?;
         assert_eq!(*investor_ai.key, investor_usdc_vault_data.owner);
-        update_amount_and_performance2(&mut fund_data, fund_reimbursement_vault_ai, true)?;
+        let fund_bal = update_amount_and_performance2(&mut fund_data, fund_reimbursement_vault_ai, true)?;
 
         assert!(investor_ai.is_signer);
         let mut investor_data = InvestorData::load_mut_checked(&investor_state_ai, program_id, fund_pda_ai.key)?;
@@ -781,6 +781,10 @@ impl Fund {
             .unwrap();
 
         investor_data.returns = compute_returns(&mut investor_data, &mut fund_data, returns)?;
+
+        if investor_data.returns > fund_bal{
+            investor_data.returns = fund_bal;
+        }
 
         if investor_data.investment_status == InvestmentStatus::PendingWithdraw {
             fund_data.no_of_pending_withdrawals = fund_data.no_of_pending_withdrawals.checked_sub(1).unwrap();
@@ -815,6 +819,67 @@ impl Fund {
         // update investor acc
         close_investor_account(investor_ai, investor_state_ai)?;
         
+        update_amount_and_performance2(&mut fund_data, fund_reimbursement_vault_ai, false)?;
+
+        Ok(())
+    }
+
+    pub fn claim_performnace_fee2(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+    ) -> Result<(), ProgramError> {
+        const NUM_FIXED: usize = 5;
+        let accounts = array_ref![accounts, 0, NUM_FIXED];
+
+        let [
+            fund_pda_ai,
+            fund_reimbursement_vault_ai,
+            manager_ai,
+            manager_usdc_vault_ai,
+            token_program_ai
+        ] = accounts;
+
+        let mut fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
+        assert_eq!(*fund_reimbursement_vault_ai.key, fund_data.reimbursement_vault, "Vault mismatch");
+        
+        assert!(manager_ai.is_signer);
+        let fund_bal = update_amount_and_performance2(&mut fund_data, fund_reimbursement_vault_ai, true)?;
+
+        let mut withdraw_amount = fund_data.performance_fee
+            .checked_floor()
+            .unwrap()
+            .checked_to_num()
+            .unwrap();
+        fund_data.performance_fee = ZERO_I80F48;
+
+        if withdraw_amount > fund_bal{
+            withdraw_amount = fund_bal;
+        }
+
+        let (manager_account, signer_nonce) = (fund_data.manager_account, fund_data.signer_nonce);
+
+        drop(fund_data);
+
+        let signer_seeds = [
+            &manager_account.as_ref(),
+            bytes_of(&signer_nonce),
+        ];
+
+        invoke_signed(
+            &spl_token::instruction::transfer(
+                token_program_ai.key,
+                fund_reimbursement_vault_ai.key,
+                manager_usdc_vault_ai.key,
+                fund_pda_ai.key,
+                &[&fund_pda_ai.key],
+                withdraw_amount,
+            )?,
+            accounts,
+            &[&signer_seeds],
+        )?;
+
+        fund_data = FundData::load_mut_checked(fund_pda_ai, program_id)?;
+
         update_amount_and_performance2(&mut fund_data, fund_reimbursement_vault_ai, false)?;
 
         Ok(())
@@ -1769,6 +1834,10 @@ impl Fund {
                 msg!("FundInstruction::Withdraw");
                 return Self::withdraw(program_id, accounts);
             }
+            FundInstruction::ClaimPerformanceFee2 => {
+                msg!("FundInstruction::ClaimPerformanceFee2");
+                return Self::claim_performnace_fee2(program_id, accounts);
+            }
 
         }
     }
@@ -1933,9 +2002,8 @@ pub fn update_amount_and_performance2(
     fund_data: &mut FundData,
     reimbursement_vault_ai: &AccountInfo,
     update_perf: bool,
-) -> Result<(), ProgramError> {
+) -> Result<u64, ProgramError> {
     let reimbursement_vault_data = parse_token_account(reimbursement_vault_ai)?;
-    assert_ne!(reimbursement_vault_data.amount, 0, "Reiumbursement not Claimed");
     let fund_val = I80F48::from_num(reimbursement_vault_data.amount);
     if update_perf {
         let mut perf = fund_data.current_index;
@@ -1959,7 +2027,7 @@ pub fn update_amount_and_performance2(
     msg!("updated amount: {:?}", fund_data.total_amount);
     msg!("updated perf {:?}", fund_data.current_index);
 
-    Ok(())
+    Ok(reimbursement_vault_data.amount)
 }
 
 pub fn get_perp_pnl(
