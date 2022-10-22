@@ -11,6 +11,7 @@ import { Reimbursement } from './components/Reimbursement';
 import { ProcessDeposits } from './components/ProcessDeposits';
 
 import { Withdraw } from './components/Withdraw';
+import { Withdraw2 } from './components/Withdraw2';
 // import { Claim } from './components/ClaimFee';
 import { DisplayInfo } from './components/DisplayInfo';
 import { AllFundsInvestors } from './components/AllFundsInvestors';
@@ -65,7 +66,7 @@ function App() {
         {/* <InitialisedFund /> */}
         <Reimbursement/>
         {/* <Deposit /> */}
-        <Withdraw />
+        <Withdraw2/>
         {/* <ProcessDeposits /> */}
         {/* <ProcessWithdraws /> */}
         {/* <Settlement /> */}
