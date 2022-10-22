@@ -392,6 +392,7 @@ export const Reimbursement = () => {
                 <th>Amount</th>
                 <th>mint</th>
                 <th>tableIndex</th>
+                <th>tokenIndex</th>
               </tr>
               {
                 claimTokensTable.length && claimTokensTable.map(t => <>
