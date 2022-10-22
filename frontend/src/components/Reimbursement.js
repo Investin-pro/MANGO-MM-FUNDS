@@ -32,6 +32,9 @@ export const Reimbursement = () => {
   const [funds, setFunds] = useState([]);
   const [claimTokensTable, setClaimTokensTable] = useState([]);
 
+  const [vault, setVault] = useState('11111111111111111');
+  const [USDCBAL, setUSDCBAL] = useState(-1)
+
 
   const walletProvider = GlobalState.useState(s => s.walletProvider);
   const ids = IDS['groups'][0]
@@ -125,6 +128,9 @@ export const Reimbursement = () => {
 
   const handleInit = async () => {
 
+    try {
+      
+   
     const key = walletProvider?.publicKey;
 
     if (!key) {
@@ -251,6 +257,9 @@ export const Reimbursement = () => {
       //     console.error('handleMakeInvestment: ', error);
       // }
 
+    } catch (error) {
+      console.log("errorLLL::",error);
+    }
   }
 
   const handleReimburse = async () => {
@@ -364,7 +373,27 @@ export const Reimbursement = () => {
   const handleFundSelect = async(event) => {
   
     setFundPDA(event.target.value);
-    console.log(`setting fundPDA :::: `,event.target.value, fundPDA)
+    console.log(`setting fundPDA :::: `,event.target.value);
+    console.log(`setting fundPDA :::: `,fundPDA);
+    
+    if(!event.target.value){
+       console.log(`bk setting fundPDA :::: `,event.target.value, fundPDA);
+      return;
+    }
+    let fundStateInfo = await connection.getAccountInfo(new PublicKey(event.target.value))
+    let fundState = FUND_DATA.decode(fundStateInfo.data)
+    console.log("fundState:: ", fundState)
+
+    const vault = fundState.reimbursement_vault_key;
+    console.log("reimbursement_vault_key vault :",vault.toBase58())
+    setVault(vault.toBase58());
+
+    // const accounts = await findAssociatedTokenAddress(walletProvider?.publicKey, vault)
+    if(vault.toBase58() !== '11111111111111111111111111111111'){
+      const walletBalance = await connection.getTokenAccountBalance(vault, 'processed')
+      const USDCBalance = walletBalance.value.uiAmountString;
+      setUSDCBAL(USDCBalance);
+    }
   }
 
   return (
@@ -386,6 +415,7 @@ export const Reimbursement = () => {
       <button onClick={handleReimburse}>Reimburse </button>
 
       <button onClick={handleFunds}>Load Funds</button>
+<<<<<<< HEAD
       <table>
             <tbody>
               <tr>
@@ -406,6 +436,15 @@ export const Reimbursement = () => {
               }
             </tbody>
           </table>
+=======
+      <br /><br /><br />
+
+      <b>Vault : {vault} </b>
+      <br />
+
+      <b>balance USDC : {USDCBAL} </b>
+
+>>>>>>> 30cf7891581f045f4745bf2f6f29c7a495ad52c5
     </div>
   )
 }
