@@ -31,6 +31,7 @@ export const Reimbursement = () => {
   const [fundPDA, setFundPDA] = useState('');
   const [funds, setFunds] = useState([]);
   const [claimTokensTable, setClaimTokensTable] = useState([]);
+  const [tableIndex, setTableIndex] = useState(0);
 
   const [vault, setVault] = useState('11111111111111111');
   const [USDCBAL, setUSDCBAL] = useState(-1)
@@ -71,6 +72,7 @@ export const Reimbursement = () => {
     const tableIndex = table.findIndex((row) =>
     row.owner.equals(new PublicKey(fundPDA))
   )
+    setTableIndex(tableIndex)
     console.log('table :>> ', table);
 
     const balancesForUser = table.find((row) =>
@@ -120,9 +122,9 @@ export const Reimbursement = () => {
       }
   }
 
-  useEffect(() => {
-    doSomething()
-  }, [fundPDA])
+  // useEffect(() => {
+  //   doSomething()
+  // }, [fundPDA])
   
 
 
@@ -271,47 +273,66 @@ export const Reimbursement = () => {
       return;
     };
 
+    // MangoV3ReimbursementClient
+    const options = AnchorProvider.defaultOptions();
+    const provider = new AnchorProvider(
+      connection,
+      walletProvider,
+      options
+    );
+    const mangoV3ReimbursementClient = new MangoV3ReimbursementClient(provider);
+
+
     console.log('selected FundPDA::', fundPDA)
   
     let fundStateInfo = await connection.getAccountInfo(new PublicKey(fundPDA))
     let fundState = FUND_DATA.decode(fundStateInfo.data)
     console.log("fundState:: ", fundState)
 
-    const transaction = new Transaction()
-  
-    const openOrdersLamports = await connection.getMinimumBalanceForRentExemption(
-          INVESTOR_DATA.span,
-          'singleGossip'
-        )
-    let signers = [];
-    
-    const investerStateAccount = await createAccountInstruction(connection, key, INVESTOR_DATA.span, programId, openOrdersLamports, transaction, signers);
-    const investorBaseTokenAccount = await createAssociatedTokenAccountIfNotExist(walletProvider, new PublicKey(ids.tokens[0].mintKey), key, transaction);
+    const transaction = new Transaction();
 
-    console.log("account size::: ", INVESTOR_DATA.span)
+    const USDCReimburseVaultTokenAccount = fundState.reimbursement_vault_key;
 
-    const dataLayout = struct([u32('instruction'), nu64('amount')])
+    const result = await mangoV3ReimbursementClient.program.account.group.all()
+    console.log('result ::: ', result)
+    const group = result.find((group) => group.account.groupNum === GROUP_NUM);
+    console.log("group:",group.publicKey.toBase58())
+    const reimbursementAccount = (
+      await PublicKey.findProgramAddress(
+        [
+          Buffer.from("ReimbursementAccount"),
+          group.publicKey.toBuffer(),
+          (new PublicKey(fundPDA)).toBuffer(),
+        ],
+        mangoV3ReimbursementClient.program.programId
+      )
+    )[0]
+    console.log("reimbursementAccount:",reimbursementAccount.toBase58())
+
+    const dataLayout = struct([u32('instruction')])
     const data = Buffer.alloc(dataLayout.span)
     dataLayout.encode(
       {
-        instruction: 1,
-        amount: amount * ( 10 ** ids.tokens[0].decimals)
+        instruction: 19,
       },
       data
     )
     const keys =  [
       { pubkey: new PublicKey(fundPDA), isSigner: false, isWritable: true }, //fund State Account
-      { pubkey: investerStateAccount, isSigner: false, isWritable: true },
+      { pubkey: MANGO_RE_IMBURSEMENT_PROG_ID, isSigner: false, isWritable: false },
+      { pubkey: group.publicKey, isSigner: false, isWritable: true },
+      
+      { pubkey: reimbursementAccount, isSigner: false, isWritable: true },
+
       { pubkey: key, isSigner: true, isWritable: true },
-      { pubkey: investorBaseTokenAccount, isSigner: false, isWritable: true }, // Investor Base Token Account
-      { pubkey: fundState.usdc_vault_key, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }
+      { pubkey: USDCReimburseVaultTokenAccount, isSigner: false, isWritable: true }, // Investor Base Token Account
+      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
     ];
 
     for(let i = 0; i<keys.length; i++){
       console.log('>>',i, keys[i].pubkey.toBase58())
     }
-
 
     const instruction = new TransactionInstruction({
       keys,
@@ -319,14 +340,72 @@ export const Reimbursement = () => {
       data
     });
 
-   
     transaction.add(instruction)
     transaction.feePayer = walletProvider?.publicKey;
     let hash = await connection.getRecentBlockhash();
-    console.log("tx", transaction);
     transaction.recentBlockhash = hash.blockhash;
-    // transaction.setSigners(key);
-    transaction.partialSign(...signers)
+    console.log("tx", transaction);
+    console.log('signers :>> ', signers);
+
+
+    // console.log("JILELE: ", row.tableIndex)
+
+    // console.log('selected FundPDA::', fundPDA)
+  
+    // let fundStateInfo = await connection.getAccountInfo(new PublicKey(fundPDA))
+    // let fundState = FUND_DATA.decode(fundStateInfo.data)
+    // console.log("fundState:: ", fundState)
+
+    // const transaction = new Transaction()
+  
+    // const openOrdersLamports = await connection.getMinimumBalanceForRentExemption(
+    //       INVESTOR_DATA.span,
+    //       'singleGossip'
+    //     )
+    // let signers = [];
+    
+    // const investerStateAccount = await createAccountInstruction(connection, key, INVESTOR_DATA.span, programId, openOrdersLamports, transaction, signers);
+    // const investorBaseTokenAccount = await createAssociatedTokenAccountIfNotExist(walletProvider, new PublicKey(ids.tokens[0].mintKey), key, transaction);
+
+    // console.log("account size::: ", INVESTOR_DATA.span)
+
+    // const dataLayout = struct([u32('instruction'), nu64('amount')])
+    // const data = Buffer.alloc(dataLayout.span)
+    // dataLayout.encode(
+    //   {
+    //     instruction: 1,
+    //     amount: amount * ( 10 ** ids.tokens[0].decimals)
+    //   },
+    //   data
+    // )
+    // const keys =  [
+    //   { pubkey: new PublicKey(fundPDA), isSigner: false, isWritable: true }, //fund State Account
+    //   { pubkey: investerStateAccount, isSigner: false, isWritable: true },
+    //   { pubkey: key, isSigner: true, isWritable: true },
+    //   { pubkey: investorBaseTokenAccount, isSigner: false, isWritable: true }, // Investor Base Token Account
+    //   { pubkey: fundState.usdc_vault_key, isSigner: false, isWritable: true },
+    //   { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }
+    // ];
+
+    // for(let i = 0; i<keys.length; i++){
+    //   console.log('>>',i, keys[i].pubkey.toBase58())
+    // }
+
+
+    // const instruction = new TransactionInstruction({
+    //   keys,
+    //   programId,
+    //   data
+    // });
+
+   
+    // transaction.add(instruction)
+    // transaction.feePayer = walletProvider?.publicKey;
+    // let hash = await connection.getRecentBlockhash();
+    // console.log("tx", transaction);
+    // transaction.recentBlockhash = hash.blockhash;
+    // // transaction.setSigners(key);
+    // transaction.partialSign(...signers)
 
     // const sign = await signAndSendTransaction(walletProvider, transaction);
     // console.log("signature tx:: ", sign)
@@ -384,17 +463,18 @@ export const Reimbursement = () => {
     let fundStateInfo = await connection.getAccountInfo(new PublicKey(event.target.value))
     let fundState = FUND_DATA.decode(fundStateInfo.data)
     console.log("fundState:: ", fundState)
-
+    
     const vault = fundState.reimbursement_vault_key;
     console.log("reimbursement_vault_key vault :",vault.toBase58())
     setVault(vault.toBase58());
-
+    
     // const accounts = await findAssociatedTokenAddress(walletProvider?.publicKey, vault)
     if(vault.toBase58() !== '11111111111111111111111111111111'){
       const walletBalance = await connection.getTokenAccountBalance(vault, 'processed')
       const USDCBalance = walletBalance.value.uiAmountString;
       setUSDCBAL(USDCBalance);
     }
+    await doSomething()
   }
 
   return (
@@ -437,6 +517,7 @@ export const Reimbursement = () => {
             </tbody>
           </table>
 
+              selected row : {JSON.stringify(row)}
       <br /><br /><br />
 
       <b>Vault : {vault} </b>
