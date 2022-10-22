@@ -347,15 +347,17 @@ export const Reimbursement = () => {
     const keys =  [
       { pubkey: new PublicKey(fundPDA), isSigner: false, isWritable: true }, //fund State Account
       { pubkey: MANGO_RE_IMBURSEMENT_PROG_ID, isSigner: false, isWritable: false },
-      { pubkey: group.publicKey, isSigner: false, isWritable: true },
+      { pubkey: group.publicKey, isSigner: false, isWritable: false },
       { pubkey: new PublicKey('2c9x2g7VUwCd9ppHDV6LxJ1YDb1799MXwvp9SKJe8YXm'), isSigner: false, isWritable: true },
       { pubkey: USDCReimburseVaultTokenAccount, isSigner: false, isWritable: true }, // Investor Base Token Account
+      { pubkey: reimbursementAccount, isSigner: false, isWritable: true },
+
       { pubkey: new PublicKey('4ZNm6giak4pBL9vo5cnGpYDm8MzPwE5fAdaWpAp2boHW'), isSigner: false, isWritable: true },
-      { pubkey: new PublicKey(ids.tokens[0].mintKey), isSigner: false, isWritable: true },
-      { pubkey: group?.account.table, isSigner: false, isWritable: true },
+      { pubkey: new PublicKey('2u3wLVR6EY2P3Pkvcy7uDXdb6gjq5ks9AwrfJ2z6tB2t'), isSigner: false, isWritable: true },
+      { pubkey: group?.account.table, isSigner: false, isWritable: false },
 
       // { pubkey: key, isSigner: true, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
     ];
