@@ -83,7 +83,7 @@ export const Reimbursement = () => {
     setTable(table);
   }
 
-  const fetchTableIndexForFund = async () => {
+  const fetchTableIndexForFund = async (fundPDA) => {
 
     console.log("----------fetchTableIndexForFund")
 
@@ -96,9 +96,12 @@ export const Reimbursement = () => {
       return;
     };
 
+    console.log('fundPDA ::: ', fundPDA)
+
     const tableIndex = table.findIndex((row) => row.owner.equals(new PublicKey(fundPDA)))
     setTableIndex(tableIndex)
     console.log('table :>> ', table);
+    console.log('tableIndex :>> ', tableIndex);
 
     const result = await mangoV3ReimbursementClient.program.account.group.all()
     console.log('result ::: ', result)
@@ -148,6 +151,7 @@ export const Reimbursement = () => {
         console.log('tableInfo :>> ', tableInfo);
         setClaimTokensTable(tableInfo)
         console.log('group ::: ', group)
+        return tableInfo
       } else {
         // resetAmountState();
         setClaimTokensTable([])
@@ -156,13 +160,7 @@ export const Reimbursement = () => {
 
   }
 
-  // useEffect(() => {
-  //   fetchTable()
-  // }, [walletProvider])
-  
-
-
-  const handleInit = async () => {
+  const handleInit = async (fundPDA) => {
 
     try {
     const key = walletProvider?.publicKey;
@@ -289,7 +287,7 @@ export const Reimbursement = () => {
     }
   }
 
-  const handleReimburse = async () => {
+  const handleReimburse = async (fundPDA, tableIndex) => {
 
     console.log("handleReimburse-------");
     const key = walletProvider?.publicKey;
@@ -406,10 +404,27 @@ export const Reimbursement = () => {
       let PDA = await PublicKey.findProgramAddress([manager.toBuffer()], programId);
       let fundState = await PublicKey.createWithSeed(manager, FUND_ACCOUNT_KEY, programId);
       // console.log(`PDA[0]`, PDA)
-      managers.push({
-        fundPDA: PDA[0].toBase58(),
-        fundManager: manager.toBase58(),
-      });
+      if(![
+        '2HFQuq1p2u2gjzbFwhE4njaVRsfMmLuTVGR1W2m4tE9f', 
+        '9ZBY5YrsbziJBTLtYcGMeBtjvuyu3FascMhfajESoRLU',
+        '2uzZtsbcuvb9vBgcrrJVPmdbAe3ZFv41GxrH1BMSAku9',
+        '5uv5HBi4vRi4RBUmXJJBfrjNgfVHGdkpfyZStVNHcbur',
+        'FNcFCY8nNxre5XoirdzR7ZLEZ1p3NekcYQCxZZ4KVX1w',
+        '2JJAQ5iiMuXLbLDPh5iEkKYT38RoJDsbN9Yrp3JNt1a6',
+        '3KCm6HmY3mrXUL8Rq2kvFuusnNywbZW6rFwV3L1dHNB4'
+      ].includes(PDA[0].toBase58())) {
+        managers.push({
+          fundPDA: PDA[0].toBase58(),
+          fundManager: manager.toBase58(),
+        });
+      }
+      console.log('fundData[i].reimbursement_vault_key.toBase58() :>> ', fundData[i].reimbursement_vault_key.toBase58());
+      if(fundData[i].reimbursement_vault_key.toBase58() === PublicKey.default.toBase58())
+      console.log(fundData[i].fundPDA.toBase58());
+      // managers.push({
+      //   fundPDA: PDA[0].toBase58(),
+      //   fundManager: manager.toBase58(),
+      // });
     }
     console.log(managers)
     setFunds(managers);
@@ -442,6 +457,41 @@ export const Reimbursement = () => {
     }
   }
 
+  const initMultiAccounts = async () => {
+    if(funds.length <= 0) {
+      return
+    } 
+
+    for (const fund of funds) {
+      console.log('fund ::: ', fund)
+      await handleInit(fund.fundPDA)
+    }
+  }
+
+  const reimburseMultiAccounts = async () => {
+    if(funds.length <= 0) {
+      return
+    } 
+
+    await fetchTable()
+
+    for (const fund of funds) {
+      console.log('fund ::: ', fund)
+      // await fetchTableIndexForFund(fund.fundPDA)
+
+      const tableIndex = table.findIndex((row) => row.owner.equals(new PublicKey(fund.fundPDA)))
+      if(tableIndex !== -1) {
+        console.log('tableIndex :>> ', tableIndex);
+        await handleReimburse(fund.fundPDA, tableIndex)
+      } else {
+        console.log("skiping ::: ", fund.fundPDA);
+      }
+      
+    }
+  }
+
+
+
   return (
     <div className="form-div">
        <h4>Investor Reimbursement</h4>
@@ -458,15 +508,15 @@ export const Reimbursement = () => {
         }
       </select>    
       <br /><br />    
-      <button onClick={handleInit}>Init </button>
-      <button onClick={handleReimburse}>Reimburse </button>
+      <button onClick={() => handleInit(fundPDA)}>Init </button>
+      <button onClick={() => handleReimburse(fundPDA, tableIndex)}>Reimburse </button>
       <br />
       <b>Selected TableIndex  : {tableIndex} </b><br />
 
       <br /><br />
       <button onClick={handleFunds}>Load Funds</button>
       <button onClick={fetchTable}>Fetch Table</button>
-      <button onClick={fetchTableIndexForFund}>Fetch TableIndex for Fund</button>
+      <button onClick={() => fetchTableIndexForFund(fundPDA)}>Fetch TableIndex for Fund</button>
 
       <br /><br />
 
@@ -502,6 +552,8 @@ export const Reimbursement = () => {
       <br />
 
       <b>balance USDC : {USDCBAL} </b>
+      <button onClick={initMultiAccounts}>initMultiAccounts</button>
+      <button onClick={reimburseMultiAccounts}>reimburse MultiAccounts</button>
     </div>
   )
 }
